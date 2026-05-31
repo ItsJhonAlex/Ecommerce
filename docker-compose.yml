@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: avanzar_postgres
+    restart: unless-stopped
+    ports:
+      # 5432 del host está ocupado -> exponemos en 5433 (dentro del contenedor sigue siendo 5432)
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-avanzar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-avanzar}
+      POSTGRES_DB: ${POSTGRES_DB:-avanzar}
+    volumes:
+      - avanzar_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-avanzar} -d ${POSTGRES_DB:-avanzar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  avanzar_pgdata:

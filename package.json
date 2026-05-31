@@ -7,6 +7,18 @@
     "apps/*",
     "packages/*"
   ],
+  "scripts": {
+    "dev": "bun --filter '*' dev",
+    "dev:backend": "bun --filter '@avanzar/backend' dev",
+    "dev:storefront": "bun --filter '@avanzar/storefront' dev",
+    "dev:admin": "bun --filter '@avanzar/admin' dev",
+    "db:generate": "bun --filter '@avanzar/db' db:generate",
+    "db:migrate": "bun --filter '@avanzar/db' db:migrate",
+    "db:push": "bun --filter '@avanzar/db' db:push",
+    "db:studio": "bun --filter '@avanzar/db' db:studio",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

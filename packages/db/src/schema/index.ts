@@ -1,10 +1,23 @@
-// Tablas de Drizzle. Ejemplo:
-// import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-//
-// export const products = pgTable("products", {
-//   id: uuid("id").primaryKey().defaultRandom(),
-//   name: text("name").notNull(),
-//   createdAt: timestamp("created_at").defaultNow().notNull(),
-// });
+// Enums
+export * from "./enums";
 
-export {};
+// Auth (Better Auth)
+export * from "./auth";
+
+// Catálogo
+export * from "./catalog";
+
+// Clientes y direcciones
+export * from "./addresses";
+
+// Pedidos
+export * from "./orders";
+
+// Pagos
+export * from "./payments";
+
+// Envío (lookup)
+export * from "./shipping";
+
+// Relaciones (query API)
+export * from "./relations";

@@ -1,0 +1,35 @@
+import { categories, productImages, productPrices, products } from "@avanzar/db/schema";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import type { z } from "zod";
+
+// Productos
+export const productSelectSchema = createSelectSchema(products);
+export const productInsertSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Precios
+export const productPriceSelectSchema = createSelectSchema(productPrices);
+export const productPriceInsertSchema = createInsertSchema(productPrices).omit({
+  id: true,
+});
+
+// Imágenes
+export const productImageSelectSchema = createSelectSchema(productImages);
+export const productImageInsertSchema = createInsertSchema(productImages).omit({
+  id: true,
+});
+
+// Categorías
+export const categorySelectSchema = createSelectSchema(categories);
+export const categoryInsertSchema = createInsertSchema(categories).omit({
+  id: true,
+});
+
+export type Product = z.infer<typeof productSelectSchema>;
+export type ProductInput = z.infer<typeof productInsertSchema>;
+export type ProductPriceInput = z.infer<typeof productPriceInsertSchema>;
+export type ProductImageInput = z.infer<typeof productImageInsertSchema>;
+export type CategoryInput = z.infer<typeof categoryInsertSchema>;

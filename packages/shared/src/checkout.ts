@@ -1,3 +1,4 @@
+import { paymentMethod } from "@avanzar/db/schema";
 import { z } from "zod";
 
 /**
@@ -28,6 +29,9 @@ export const checkoutSchema = z.object({
     reference: z.string().optional(),
   }),
   items: z.array(checkoutItemSchema).min(1),
+  payment: z.object({
+    method: z.enum(paymentMethod.enumValues),
+  }),
 });
 
 export type CheckoutItemInput = z.infer<typeof checkoutItemSchema>;

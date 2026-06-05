@@ -1,6 +1,6 @@
 import { categories, productImages, productPrices, products } from "@avanzar/db/schema";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import type { z } from "zod";
+import { z } from "zod";
 
 // Productos
 export const productSelectSchema = createSelectSchema(products);
@@ -33,3 +33,10 @@ export type ProductInput = z.infer<typeof productInsertSchema>;
 export type ProductPriceInput = z.infer<typeof productPriceInsertSchema>;
 export type ProductImageInput = z.infer<typeof productImageInsertSchema>;
 export type CategoryInput = z.infer<typeof categoryInsertSchema>;
+
+/** Body de POST /admin/products/:id/categories (vincular categoría existente). */
+export const linkCategorySchema = z.object({
+  categoryId: z.uuid(),
+});
+
+export type LinkCategoryInput = z.infer<typeof linkCategorySchema>;

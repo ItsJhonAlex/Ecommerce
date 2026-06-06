@@ -5,6 +5,7 @@
   "dependencies": {
     "@avanzar/db": "workspace:*",
     "@avanzar/shared": "workspace:*",
+    "@hono/swagger-ui": "^0.6.1",
     "better-auth": "^1.6.13",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.23",
@@ -14,7 +15,10 @@
   "scripts": {
     "dev": "bun run --hot --env-file=../../.env src/index.ts",
     "start": "bun run --env-file=../../.env src/index.ts",
-    "test": "bun test"
+    "test": "bun test src/",
+    "seed:admin": "bun run --env-file=../../.env src/scripts/create-admin.ts",
+    "db:test:setup": "bun run --env-file=../../.env src/scripts/setup-test-db.ts",
+    "test:integration": "bun run db:test:setup && bun test --env-file=../../.env test/"
   },
   "type": "module"
 }

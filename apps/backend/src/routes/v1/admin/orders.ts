@@ -1,11 +1,17 @@
 import { db } from "@avanzar/db";
-import { orderStatusHistory, orders } from "@avanzar/db/schema";
+import {
+  orderItems,
+  orderStatusHistory,
+  orders,
+  products,
+} from "@avanzar/db/schema";
 import { updateOrderStatusSchema } from "@avanzar/shared";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
 import { parseJson } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
+import { canTransition } from "../../../services/order-status";
 
 export const adminOrdersRouter = new Hono<AuthEnv>();
 
@@ -50,6 +56,13 @@ adminOrdersRouter.patch("/:id/status", async (c) => {
   if (existing.status === status) {
     return fail(c, 409, "El pedido ya está en ese estado");
   }
+  if (!canTransition(existing.status, status)) {
+    return fail(c, 422, "INVALID_TRANSITION", {
+      code: "INVALID_TRANSITION",
+      from: existing.status,
+      to: status,
+    });
+  }
 
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx
@@ -62,6 +75,27 @@ adminOrdersRouter.patch("/:id/status", async (c) => {
       status,
       changedBy,
     });
+
+    // Cancelar repone el stock descontado en el checkout. Solo para items cuyo
+    // producto sigue existiendo (productId es set-null si el producto se borró).
+    if (status === "cancelled") {
+      const items = await tx
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, id));
+      for (const it of items) {
+        if (it.productId) {
+          await tx
+            .update(products)
+            .set({
+              stockQuantity: sql`${products.stockQuantity} + ${it.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, it.productId));
+        }
+      }
+    }
+
     return row;
   });
 

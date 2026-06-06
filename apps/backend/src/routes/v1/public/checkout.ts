@@ -4,10 +4,11 @@ import {
   orderStatusHistory,
   orders,
   payments,
+  products,
   shippingRates,
 } from "@avanzar/db/schema";
 import { checkoutSchema } from "@avanzar/shared";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { auth } from "../../../auth";
 import { fail } from "../../../lib/responses";
@@ -19,7 +20,7 @@ import {
   resolveCheckoutItems,
 } from "../../../services/checkout";
 
-/** Checkout: crea orden + items + historial + pago pending en una transacción. */
+/** Checkout: descuenta stock, crea orden + items + historial + pago pending en una transacción. */
 export const checkoutRouter = new Hono();
 
 // POST /api/v1/checkout
@@ -72,61 +73,92 @@ checkoutRouter.post("/", async (c) => {
   const totals = computeOrderTotals(lines, rate.amountMinor);
   const orderNumber = generateOrderNumber(new Date(), Math.random());
 
-  const result = await db.transaction(async (tx) => {
-    const [order] = await tx
-      .insert(orders)
-      .values({
-        orderNumber,
-        userId,
+  let result;
+  try {
+    result = await db.transaction(async (tx) => {
+      // Decremento atómico de stock (anti-sobreventa). El WHERE stock >= qty evita
+      // vender de más bajo concurrencia: si no afecta fila, el stock es insuficiente.
+      for (const line of lines) {
+        const [updated] = await tx
+          .update(products)
+          .set({
+            stockQuantity: sql`${products.stockQuantity} - ${line.quantity}`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(products.id, line.productId),
+              gte(products.stockQuantity, line.quantity),
+            ),
+          )
+          .returning({ id: products.id });
+        if (!updated) {
+          throw new CheckoutError("INSUFFICIENT_STOCK", {
+            productId: line.productId,
+          });
+        }
+      }
+
+      const [order] = await tx
+        .insert(orders)
+        .values({
+          orderNumber,
+          userId,
+          status: "pending_payment",
+          currency: input.currency,
+          buyerName: input.buyer.name,
+          buyerEmail: input.buyer.email,
+          buyerPhone: input.buyer.phone,
+          shipRecipient: input.recipient.name,
+          shipPhone: input.recipient.phone,
+          shipProvince: input.recipient.province,
+          shipMunicipality: input.recipient.municipality,
+          shipAddressLine: input.recipient.addressLine,
+          shipReference: input.recipient.reference ?? null,
+          subtotalMinor: totals.subtotalMinor,
+          shippingMinor: totals.shippingMinor,
+          discountMinor: totals.discountMinor,
+          totalMinor: totals.totalMinor,
+        })
+        .returning();
+      if (!order) throw new Error("No se pudo crear la orden");
+
+      await tx.insert(orderItems).values(
+        lines.map((l) => ({
+          orderId: order.id,
+          productId: l.productId,
+          productName: l.productName,
+          unitAmountMinor: l.unitAmountMinor,
+          quantity: l.quantity,
+          lineTotalMinor: l.lineTotalMinor,
+        })),
+      );
+
+      await tx.insert(orderStatusHistory).values({
+        orderId: order.id,
         status: "pending_payment",
-        currency: input.currency,
-        buyerName: input.buyer.name,
-        buyerEmail: input.buyer.email,
-        buyerPhone: input.buyer.phone,
-        shipRecipient: input.recipient.name,
-        shipPhone: input.recipient.phone,
-        shipProvince: input.recipient.province,
-        shipMunicipality: input.recipient.municipality,
-        shipAddressLine: input.recipient.addressLine,
-        shipReference: input.recipient.reference ?? null,
-        subtotalMinor: totals.subtotalMinor,
-        shippingMinor: totals.shippingMinor,
-        discountMinor: totals.discountMinor,
-        totalMinor: totals.totalMinor,
-      })
-      .returning();
-    if (!order) throw new Error("No se pudo crear la orden");
+        changedBy: userId,
+      });
 
-    await tx.insert(orderItems).values(
-      lines.map((l) => ({
-        orderId: order.id,
-        productId: l.productId,
-        productName: l.productName,
-        unitAmountMinor: l.unitAmountMinor,
-        quantity: l.quantity,
-        lineTotalMinor: l.lineTotalMinor,
-      })),
-    );
+      const [payment] = await tx
+        .insert(payments)
+        .values({
+          orderId: order.id,
+          method: input.payment.method,
+          status: "pending",
+          amountMinor: totals.totalMinor,
+          currency: input.currency,
+        })
+        .returning();
 
-    await tx.insert(orderStatusHistory).values({
-      orderId: order.id,
-      status: "pending_payment",
-      changedBy: userId,
+      return { order, payment };
     });
-
-    const [payment] = await tx
-      .insert(payments)
-      .values({
-        orderId: order.id,
-        method: input.payment.method,
-        status: "pending",
-        amountMinor: totals.totalMinor,
-        currency: input.currency,
-      })
-      .returning();
-
-    return { order, payment };
-  });
+  } catch (e) {
+    if (e instanceof CheckoutError) {
+      return fail(c, 422, e.code, { code: e.code, ...e.details });
+    }
+    throw e;
+  }
 
   return c.json(result, 201);
 });

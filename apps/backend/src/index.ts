@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { auth } from "./auth";
 import { v1 } from "./routes/v1";
 
-const app = new Hono();
+export const app = new Hono();
 
 // CORS para toda la API (auth con cookies de sesión => credentials: true).
 app.use(
@@ -11,7 +11,7 @@ app.use(
   cors({
     origin: ["http://localhost:4321", "http://localhost:5174"],
     allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["POST", "GET", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
     maxAge: 600,
     credentials: true,

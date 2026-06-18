@@ -1,6 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { account, db, session, user, verification } from "@avanzar/db";
+import { loadEnv } from "./env";
+
+const env = loadEnv();
 
 /**
  * Instancia de Better Auth.
@@ -8,10 +11,10 @@ import { account, db, session, user, verification } from "@avanzar/db";
  * - `role` se declara como additionalField (la columna ya existe en la DB como
  *   enum user_role). `input: false` => el cliente no puede setear su propio rol
  *   en el signup; arranca en "customer" y solo el staff/admin lo cambia server-side.
- * - El secret y la baseURL salen del entorno (BETTER_AUTH_SECRET / BETTER_AUTH_URL).
+ * - El secret sale del entorno (BETTER_AUTH_SECRET); la baseURL de env validado.
  */
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL: env.BETTER_AUTH_URL,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: { user, session, account, verification },

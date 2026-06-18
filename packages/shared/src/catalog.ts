@@ -1,4 +1,4 @@
-import { categories, productImages, productPrices, products } from "@avanzar/db/schema";
+import { categories, productImages, productPrices, products, productStatus } from "@avanzar/db/schema";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -40,3 +40,14 @@ export const linkCategorySchema = z.object({
 });
 
 export type LinkCategoryInput = z.infer<typeof linkCategorySchema>;
+
+/**
+ * Query de GET /admin/products. status y q opcionales pero validados.
+ * `q` vacío ("" — p. ej. al limpiar el buscador) se trata como ausente, no como error.
+ */
+export const productAdminQuerySchema = z.object({
+  status: z.enum(productStatus.enumValues).optional(),
+  q: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional()),
+});
+
+export type ProductAdminQuery = z.infer<typeof productAdminQuerySchema>;

@@ -1,19 +1,22 @@
 import { db } from "@avanzar/db";
 import { orderStatusHistory, orders, payments } from "@avanzar/db/schema";
-import { confirmPaymentSchema } from "@avanzar/shared";
-import { eq } from "drizzle-orm";
+import { confirmPaymentSchema, paymentListQuerySchema } from "@avanzar/shared";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
-import { parseJson } from "../../../lib/validate";
+import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
 
 export const adminPaymentsRouter = new Hono<AuthEnv>();
 
 // GET /api/v1/admin/payments?status=
 adminPaymentsRouter.get("/", async (c) => {
-  const status = c.req.query("status");
+  const parsed = parseQuery(c, paymentListQuerySchema);
+  if (!parsed.ok) return parsed.response;
+  const { status } = parsed.data;
+
   const items = await db.query.payments.findMany({
-    where: status ? (p, { eq: e }) => e(p.status, status as never) : undefined,
+    where: status ? (p, { eq: e }) => e(p.status, status) : undefined,
     orderBy: (p, { desc }) => [desc(p.createdAt)],
   });
   return c.json({ payments: items });
@@ -41,11 +44,9 @@ adminPaymentsRouter.patch("/:id/confirm", async (c) => {
     where: (p, { eq: e }) => e(p.id, id),
   });
   if (!existing) return fail(c, 404, "Pago no encontrado");
-  if (existing.status !== "pending") {
-    return fail(c, 409, "El pago no está pendiente");
-  }
 
   const confirmed = await db.transaction(async (tx) => {
+    // UPDATE condicional sobre status='pending': atómico contra doble confirmación.
     const [payment] = await tx
       .update(payments)
       .set({
@@ -55,21 +56,23 @@ adminPaymentsRouter.patch("/:id/confirm", async (c) => {
         confirmedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(payments.id, id))
+      .where(and(eq(payments.id, id), eq(payments.status, "pending")))
       .returning();
-    if (!payment) throw new Error("No se pudo actualizar el pago");
+    if (!payment) return null;
 
-    // Promover la orden a 'paid' si seguía esperando pago.
-    const order = await tx.query.orders.findFirst({
-      where: (o, { eq: e }) => e(o.id, payment.orderId),
-    });
-    if (order && order.status === "pending_payment") {
-      await tx
-        .update(orders)
-        .set({ status: "paid", updatedAt: new Date() })
-        .where(eq(orders.id, order.id));
+    // Promover la orden a 'paid' solo si seguía esperando pago. El UPDATE
+    // condicional sobre status='pending_payment' es atómico: si otra confirmación
+    // ya la promovió, no afecta fila y no duplicamos la entrada de historial.
+    const [promoted] = await tx
+      .update(orders)
+      .set({ status: "paid", updatedAt: new Date() })
+      .where(
+        and(eq(orders.id, payment.orderId), eq(orders.status, "pending_payment")),
+      )
+      .returning();
+    if (promoted) {
       await tx.insert(orderStatusHistory).values({
-        orderId: order.id,
+        orderId: promoted.id,
         status: "paid",
         changedBy: confirmedBy,
       });
@@ -78,5 +81,8 @@ adminPaymentsRouter.patch("/:id/confirm", async (c) => {
     return payment;
   });
 
+  if (!confirmed) {
+    return fail(c, 409, "El pago no está pendiente");
+  }
   return c.json({ payment: confirmed });
 });

@@ -6,4 +6,10 @@ export const updateOrderStatusSchema = z.object({
   status: z.enum(orderStatus.enumValues),
 });
 
+/** Query de GET /admin/orders. El filtro de estado es opcional pero validado. */
+export const orderListQuerySchema = z.object({
+  status: z.enum(orderStatus.enumValues).optional(),
+});
+
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+export type OrderListQuery = z.infer<typeof orderListQuerySchema>;

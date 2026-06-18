@@ -7,6 +7,7 @@ import {
 } from "@avanzar/db/schema";
 import {
   linkCategorySchema,
+  productAdminQuerySchema,
   productImageInsertSchema,
   productInsertSchema,
   productPriceInsertSchema,
@@ -14,7 +15,7 @@ import {
 import { type SQL, and, eq, ilike } from "drizzle-orm";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
-import { parseJson } from "../../../lib/validate";
+import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
 
 /** CRUD de productos para admin. Incluye todos los status (draft/active/archived). */
@@ -22,10 +23,12 @@ export const adminProductsRouter = new Hono<AuthEnv>();
 
 // GET /api/v1/admin/products?status=&q=
 adminProductsRouter.get("/", async (c) => {
-  const status = c.req.query("status");
-  const q = c.req.query("q");
+  const parsed = parseQuery(c, productAdminQuerySchema);
+  if (!parsed.ok) return parsed.response;
+  const { status, q } = parsed.data;
+
   const conditions: SQL[] = [];
-  if (status) conditions.push(eq(products.status, status as never));
+  if (status) conditions.push(eq(products.status, status));
   if (q) conditions.push(ilike(products.name, `%${q}%`));
 
   const items = await db.query.products.findMany({

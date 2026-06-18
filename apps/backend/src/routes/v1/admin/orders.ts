@@ -5,11 +5,11 @@ import {
   orders,
   products,
 } from "@avanzar/db/schema";
-import { updateOrderStatusSchema } from "@avanzar/shared";
-import { eq, sql } from "drizzle-orm";
+import { orderListQuerySchema, updateOrderStatusSchema } from "@avanzar/shared";
+import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
-import { parseJson } from "../../../lib/validate";
+import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
 import { canTransition } from "../../../services/order-status";
 
@@ -17,9 +17,12 @@ export const adminOrdersRouter = new Hono<AuthEnv>();
 
 // GET /api/v1/admin/orders?status=
 adminOrdersRouter.get("/", async (c) => {
-  const status = c.req.query("status");
+  const parsed = parseQuery(c, orderListQuerySchema);
+  if (!parsed.ok) return parsed.response;
+  const { status } = parsed.data;
+
   const items = await db.query.orders.findMany({
-    where: status ? (o, { eq: e }) => e(o.status, status as never) : undefined,
+    where: status ? (o, { eq: e }) => e(o.status, status) : undefined,
     orderBy: (o, { desc }) => [desc(o.createdAt)],
     with: { items: true, payments: true },
   });
@@ -64,12 +67,16 @@ adminOrdersRouter.patch("/:id/status", async (c) => {
     });
   }
 
-  const updated = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // UPDATE condicional sobre el estado esperado: si otro request ya cambió el
+    // estado entre el read y este write, no afecta fila y abortamos (409).
     const [row] = await tx
       .update(orders)
       .set({ status, updatedAt: new Date() })
-      .where(eq(orders.id, id))
+      .where(and(eq(orders.id, id), eq(orders.status, existing.status)))
       .returning();
+    if (!row) return null;
+
     await tx.insert(orderStatusHistory).values({
       orderId: id,
       status,
@@ -99,5 +106,8 @@ adminOrdersRouter.patch("/:id/status", async (c) => {
     return row;
   });
 
-  return c.json({ order: updated });
+  if (!result) {
+    return fail(c, 409, "El pedido cambió de estado, reintentá");
+  }
+  return c.json({ order: result });
 });

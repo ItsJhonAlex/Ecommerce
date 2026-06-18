@@ -1,10 +1,10 @@
 import { db } from "@avanzar/db";
 import { user } from "@avanzar/db/schema";
-import { updateUserRoleSchema } from "@avanzar/shared";
+import { updateUserRoleSchema, userListQuerySchema } from "@avanzar/shared";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
-import { parseJson } from "../../../lib/validate";
+import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
 
 /** Solo campos no sensibles del usuario. */
@@ -22,12 +22,12 @@ export const adminUsersRouter = new Hono<AuthEnv>();
 
 // GET /api/v1/admin/users?role=
 adminUsersRouter.get("/", async (c) => {
-  const role = c.req.query("role");
+  const parsed = parseQuery(c, userListQuerySchema);
+  if (!parsed.ok) return parsed.response;
+  const { role } = parsed.data;
+
   const rows = role
-    ? await db
-        .select(SAFE_USER_COLUMNS)
-        .from(user)
-        .where(eq(user.role, role as never))
+    ? await db.select(SAFE_USER_COLUMNS).from(user).where(eq(user.role, role))
     : await db.select(SAFE_USER_COLUMNS).from(user);
   return c.json({ users: rows });
 });

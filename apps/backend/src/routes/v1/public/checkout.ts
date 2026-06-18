@@ -11,6 +11,7 @@ import { checkoutSchema } from "@avanzar/shared";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { auth } from "../../../auth";
+import { isUniqueViolation } from "../../../lib/db-errors";
 import { fail } from "../../../lib/responses";
 import { parseJson } from "../../../lib/validate";
 import {
@@ -19,6 +20,9 @@ import {
   generateOrderNumber,
   resolveCheckoutItems,
 } from "../../../services/checkout";
+
+/** Cuántas veces se reintenta el checkout ante colisión del order_number. */
+const MAX_ORDER_NUMBER_ATTEMPTS = 5;
 
 /** Checkout: descuenta stock, crea orden + items + historial + pago pending en una transacción. */
 export const checkoutRouter = new Hono();
@@ -71,94 +75,109 @@ checkoutRouter.post("/", async (c) => {
   }
 
   const totals = computeOrderTotals(lines, rate.amountMinor);
-  const orderNumber = generateOrderNumber(new Date(), Math.random());
 
-  let result;
-  try {
-    result = await db.transaction(async (tx) => {
-      // Decremento atómico de stock (anti-sobreventa). El WHERE stock >= qty evita
-      // vender de más bajo concurrencia: si no afecta fila, el stock es insuficiente.
-      for (const line of lines) {
-        const [updated] = await tx
-          .update(products)
-          .set({
-            stockQuantity: sql`${products.stockQuantity} - ${line.quantity}`,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(products.id, line.productId),
-              gte(products.stockQuantity, line.quantity),
-            ),
-          )
-          .returning({ id: products.id });
-        if (!updated) {
-          throw new CheckoutError("INSUFFICIENT_STOCK", {
-            productId: line.productId,
-          });
+  // La transacción se reintenta si el order_number aleatorio colisiona (unique).
+  // Cada intento regenera el número; el rollback revierte el decremento de stock.
+  for (let attempt = 1; attempt <= MAX_ORDER_NUMBER_ATTEMPTS; attempt++) {
+    const orderNumber = generateOrderNumber(new Date(), Math.random());
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Decremento atómico de stock (anti-sobreventa). El WHERE stock >= qty evita
+        // vender de más bajo concurrencia: si no afecta fila, el stock es insuficiente.
+        for (const line of lines) {
+          const [updated] = await tx
+            .update(products)
+            .set({
+              stockQuantity: sql`${products.stockQuantity} - ${line.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(products.id, line.productId),
+                gte(products.stockQuantity, line.quantity),
+              ),
+            )
+            .returning({ id: products.id });
+          if (!updated) {
+            throw new CheckoutError("INSUFFICIENT_STOCK", {
+              productId: line.productId,
+            });
+          }
         }
-      }
 
-      const [order] = await tx
-        .insert(orders)
-        .values({
-          orderNumber,
-          userId,
-          status: "pending_payment",
-          currency: input.currency,
-          buyerName: input.buyer.name,
-          buyerEmail: input.buyer.email,
-          buyerPhone: input.buyer.phone,
-          shipRecipient: input.recipient.name,
-          shipPhone: input.recipient.phone,
-          shipProvince: input.recipient.province,
-          shipMunicipality: input.recipient.municipality,
-          shipAddressLine: input.recipient.addressLine,
-          shipReference: input.recipient.reference ?? null,
-          subtotalMinor: totals.subtotalMinor,
-          shippingMinor: totals.shippingMinor,
-          discountMinor: totals.discountMinor,
-          totalMinor: totals.totalMinor,
-        })
-        .returning();
-      if (!order) throw new Error("No se pudo crear la orden");
+        const [order] = await tx
+          .insert(orders)
+          .values({
+            orderNumber,
+            userId,
+            status: "pending_payment",
+            currency: input.currency,
+            buyerName: input.buyer.name,
+            buyerEmail: input.buyer.email,
+            buyerPhone: input.buyer.phone,
+            shipRecipient: input.recipient.name,
+            shipPhone: input.recipient.phone,
+            shipProvince: input.recipient.province,
+            shipMunicipality: input.recipient.municipality,
+            shipAddressLine: input.recipient.addressLine,
+            shipReference: input.recipient.reference ?? null,
+            subtotalMinor: totals.subtotalMinor,
+            shippingMinor: totals.shippingMinor,
+            discountMinor: totals.discountMinor,
+            totalMinor: totals.totalMinor,
+          })
+          .returning();
+        if (!order) throw new Error("No se pudo crear la orden");
 
-      await tx.insert(orderItems).values(
-        lines.map((l) => ({
+        await tx.insert(orderItems).values(
+          lines.map((l) => ({
+            orderId: order.id,
+            productId: l.productId,
+            productName: l.productName,
+            unitAmountMinor: l.unitAmountMinor,
+            quantity: l.quantity,
+            lineTotalMinor: l.lineTotalMinor,
+          })),
+        );
+
+        await tx.insert(orderStatusHistory).values({
           orderId: order.id,
-          productId: l.productId,
-          productName: l.productName,
-          unitAmountMinor: l.unitAmountMinor,
-          quantity: l.quantity,
-          lineTotalMinor: l.lineTotalMinor,
-        })),
-      );
+          status: "pending_payment",
+          changedBy: userId,
+        });
 
-      await tx.insert(orderStatusHistory).values({
-        orderId: order.id,
-        status: "pending_payment",
-        changedBy: userId,
+        const [payment] = await tx
+          .insert(payments)
+          .values({
+            orderId: order.id,
+            method: input.payment.method,
+            status: "pending",
+            amountMinor: totals.totalMinor,
+            currency: input.currency,
+          })
+          .returning();
+
+        return { order, payment };
       });
 
-      const [payment] = await tx
-        .insert(payments)
-        .values({
-          orderId: order.id,
-          method: input.payment.method,
-          status: "pending",
-          amountMinor: totals.totalMinor,
-          currency: input.currency,
-        })
-        .returning();
-
-      return { order, payment };
-    });
-  } catch (e) {
-    if (e instanceof CheckoutError) {
-      return fail(c, 422, e.code, { code: e.code, ...e.details });
+      return c.json(result, 201);
+    } catch (e) {
+      if (e instanceof CheckoutError) {
+        return fail(c, 422, e.code, { code: e.code, ...e.details });
+      }
+      // Colisión del order_number: reintentar con otro número si quedan intentos.
+      if (isUniqueViolation(e)) {
+        if (attempt < MAX_ORDER_NUMBER_ATTEMPTS) continue;
+        return fail(c, 503, "No se pudo generar el número de orden, reintentá", {
+          code: "ORDER_NUMBER_COLLISION",
+        });
+      }
+      throw e; // error inesperado => onError global => 500
     }
-    throw e;
   }
 
-  return c.json(result, 201);
+  // Inalcanzable (el loop retorna o lanza), pero TS necesita un return final.
+  return fail(c, 503, "No se pudo generar el número de orden, reintentá", {
+    code: "ORDER_NUMBER_COLLISION",
+  });
 });

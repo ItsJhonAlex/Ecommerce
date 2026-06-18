@@ -34,6 +34,9 @@ app.route("/api/v1", v1);
 // Healthcheck.
 app.get("/health", (c) => c.json({ status: "ok" }));
 
+// Ruta inexistente: 404 en JSON, consistente con el resto de la API.
+app.notFound((c) => c.json({ error: "Ruta no encontrada" }, 404));
+
 // Red de seguridad: cualquier throw no controlado responde 500 uniforme y se
 // loguea con stack del lado servidor (sin filtrar internals al cliente).
 app.onError((err, c) => {

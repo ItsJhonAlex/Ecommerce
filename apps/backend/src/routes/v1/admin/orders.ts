@@ -109,5 +109,16 @@ adminOrdersRouter.patch("/:id/status", async (c) => {
   if (!result) {
     return fail(c, 409, "El pedido cambió de estado, reintentá");
   }
-  return c.json({ order: result });
+
+  // Releer con relaciones para devolver la misma forma que GET /:id (la fila
+  // existe: la acabamos de actualizar dentro de la transacción).
+  const order = await db.query.orders.findFirst({
+    where: (o, { eq: e }) => e(o.id, id),
+    with: {
+      items: true,
+      payments: true,
+      statusHistory: { orderBy: (h, { asc }) => [asc(h.createdAt)] },
+    },
+  });
+  return c.json({ order });
 });

@@ -48,7 +48,13 @@ describe("PATCH /api/v1/admin/orders/:id/status", () => {
       body: JSON.stringify({ status: "paid" }),
     });
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { order: { status: string } }).order.status).toBe("paid");
+    const patched = (await res.json()) as {
+      order: { status: string; items: unknown[]; payments: unknown[] };
+    };
+    expect(patched.order.status).toBe("paid");
+    // El PATCH devuelve la misma forma que GET /:id (con relaciones).
+    expect(Array.isArray(patched.order.items)).toBe(true);
+    expect(Array.isArray(patched.order.payments)).toBe(true);
 
     const detail = await request(`/api/v1/admin/orders/${orderId}`, {
       headers: { Cookie: cookie },

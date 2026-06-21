@@ -13,3 +13,7 @@ export const paymentListQuerySchema = z.object({
 
 export type ConfirmPaymentInput = z.infer<typeof confirmPaymentSchema>;
 export type PaymentListQuery = z.infer<typeof paymentListQuerySchema>;
+
+/** Array de estados de pago (para poblar selects en el front sin tocar @avanzar/db). */
+export const PAYMENT_STATUSES: readonly (typeof paymentStatus.enumValues)[number][] =
+  paymentStatus.enumValues;

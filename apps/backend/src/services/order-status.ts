@@ -1,23 +1,10 @@
-import { orderStatus } from "@avanzar/db/schema";
-
-/** Unión de los estados posibles de una orden (derivada del enum de la DB). */
-export type OrderStatus = (typeof orderStatus.enumValues)[number];
-
 /**
- * Grafo de transiciones permitidas. Avance hacia adelante; cancelable solo antes
- * de `shipped`. `delivered` y `cancelled` son terminales. El restock al cancelar
- * lo aplica el caller (admin/orders), no este módulo puro.
+ * La lógica de transiciones vive en @avanzar/shared (única fuente de verdad,
+ * compartida con el panel admin). Este módulo re-exporta para preservar el
+ * import path histórico del backend.
  */
-export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending_payment: ["paid", "cancelled"],
-  paid: ["preparing", "cancelled"],
-  preparing: ["shipped", "cancelled"],
-  shipped: ["delivered"],
-  delivered: [],
-  cancelled: [],
-};
-
-/** True si `from -> to` es una transición permitida. */
-export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
-  return ALLOWED_TRANSITIONS[from].includes(to);
-}
+export {
+  ALLOWED_TRANSITIONS,
+  canTransition,
+  type OrderStatus,
+} from "@avanzar/shared";

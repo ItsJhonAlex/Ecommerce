@@ -1,3 +1,4 @@
+import { isAdminRole } from "@avanzar/shared";
 import { createMiddleware } from "hono/factory";
 import { auth } from "../auth";
 
@@ -11,8 +12,6 @@ export type AuthEnv = {
     session: SessionData;
   };
 };
-
-const ADMIN_ROLES = new Set(["admin", "staff"]);
 
 /** Lee el rol del usuario de forma defensiva (additionalField de Better Auth). */
 function roleOf(user: SessionUser): string {
@@ -32,7 +31,7 @@ export const requireSession = createMiddleware<AuthEnv>(async (c, next) => {
 export const requireAdmin = createMiddleware<AuthEnv>(async (c, next) => {
   const result = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!result) return c.json({ error: "No autenticado" }, 401);
-  if (!ADMIN_ROLES.has(roleOf(result.user))) {
+  if (!isAdminRole(roleOf(result.user))) {
     return c.json({ error: "Acceso denegado" }, 403);
   }
   c.set("user", result.user);

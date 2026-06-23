@@ -45,40 +45,58 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <Card className="w-full max-w-sm p-6">
-        <h1 className="mb-4 text-lg font-semibold">Avanzar · Admin</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <div className="grid size-11 place-items-center rounded-xl bg-primary font-display text-xl font-extrabold text-primary-foreground">
+            A
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          {error && (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
+          <div>
+            <h1 className="font-display text-xl font-bold tracking-tight">
+              Avanzar · Admin
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Consola de operaciones
             </p>
-          )}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Ingresando…" : "Ingresar"}
-          </Button>
-        </form>
-      </Card>
+          </div>
+        </div>
+
+        <Card className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="vos@avanzar.test"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Contraseña</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Ingresando…" : "Ingresar"}
+            </Button>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }

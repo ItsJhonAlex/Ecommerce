@@ -7,11 +7,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 export type Column<T> = {
   key: string;
   header: string;
   render: (row: T) => ReactNode;
+  /** Alineación de la celda. Usar "right" para columnas numéricas. */
+  align?: "left" | "right";
 };
 
 type Props<T> = {
@@ -21,30 +24,48 @@ type Props<T> = {
   onRowClick?: (row: T) => void;
 };
 
-/** Tabla genérica controlada por `columns` y `rows`. */
+/** Tabla genérica controlada por `columns` y `rows`, dentro de un card. */
 export function DataTable<T>({ columns, rows, rowKey, onRowClick }: Props<T>) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {columns.map((c) => (
-            <TableHead key={c.key}>{c.header}</TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow
-            key={rowKey(row)}
-            onClick={onRowClick ? () => onRowClick(row) : undefined}
-            className={onRowClick ? "cursor-pointer" : undefined}
-          >
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-b bg-muted/40 hover:bg-muted/40">
             {columns.map((c) => (
-              <TableCell key={c.key}>{c.render(row)}</TableCell>
+              <TableHead
+                key={c.key}
+                className={cn(
+                  "h-10 text-xs font-medium uppercase tracking-wide text-muted-foreground",
+                  c.align === "right" && "text-right",
+                )}
+              >
+                {c.header}
+              </TableHead>
             ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow
+              key={rowKey(row)}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              className={cn(
+                "border-border/60 transition-colors",
+                onRowClick && "cursor-pointer hover:bg-accent/50",
+              )}
+            >
+              {columns.map((c) => (
+                <TableCell
+                  key={c.key}
+                  className={cn("py-3", c.align === "right" && "text-right")}
+                >
+                  {c.render(row)}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

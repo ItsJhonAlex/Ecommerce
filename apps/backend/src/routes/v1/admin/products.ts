@@ -14,6 +14,7 @@ import {
 } from "@avanzar/shared";
 import { type SQL, and, eq, ilike } from "drizzle-orm";
 import { Hono } from "hono";
+import { isUniqueViolation } from "../../../lib/db-errors";
 import { fail } from "../../../lib/responses";
 import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
@@ -58,8 +59,17 @@ adminProductsRouter.get("/:id", async (c) => {
 adminProductsRouter.post("/", async (c) => {
   const parsed = await parseJson(c, productInsertSchema);
   if (!parsed.ok) return parsed.response;
-  const [created] = await db.insert(products).values(parsed.data).returning();
-  return c.json({ product: created }, 201);
+  try {
+    const [created] = await db.insert(products).values(parsed.data).returning();
+    return c.json({ product: created }, 201);
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      return fail(c, 409, "Ese slug ya está en uso", {
+        code: "PRODUCT_SLUG_TAKEN",
+      });
+    }
+    throw e;
+  }
 });
 
 // PATCH /api/v1/admin/products/:id
@@ -67,13 +77,22 @@ adminProductsRouter.patch("/:id", async (c) => {
   const id = c.req.param("id");
   const parsed = await parseJson(c, productInsertSchema.partial());
   if (!parsed.ok) return parsed.response;
-  const [updated] = await db
-    .update(products)
-    .set({ ...parsed.data, updatedAt: new Date() })
-    .where(eq(products.id, id))
-    .returning();
-  if (!updated) return fail(c, 404, "Producto no encontrado");
-  return c.json({ product: updated });
+  try {
+    const [updated] = await db
+      .update(products)
+      .set({ ...parsed.data, updatedAt: new Date() })
+      .where(eq(products.id, id))
+      .returning();
+    if (!updated) return fail(c, 404, "Producto no encontrado");
+    return c.json({ product: updated });
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      return fail(c, 409, "Ese slug ya está en uso", {
+        code: "PRODUCT_SLUG_TAKEN",
+      });
+    }
+    throw e;
+  }
 });
 
 // POST /api/v1/admin/products/:id/archive  (soft delete, idempotente)
@@ -95,11 +114,20 @@ adminProductsRouter.post("/:id/prices", async (c) => {
   const productId = c.req.param("id");
   const parsed = await parseJson(c, productPriceInsertSchema.omit({ productId: true }));
   if (!parsed.ok) return parsed.response;
-  const [created] = await db
-    .insert(productPrices)
-    .values({ ...parsed.data, productId })
-    .returning();
-  return c.json({ price: created }, 201);
+  try {
+    const [created] = await db
+      .insert(productPrices)
+      .values({ ...parsed.data, productId })
+      .returning();
+    return c.json({ price: created }, 201);
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      return fail(c, 409, "Ya existe un precio para esa moneda", {
+        code: "PRICE_CURRENCY_EXISTS",
+      });
+    }
+    throw e;
+  }
 });
 
 // PATCH /api/v1/admin/products/:id/prices/:priceId

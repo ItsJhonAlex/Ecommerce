@@ -5,6 +5,7 @@ import {
   orderStatusLabel,
   paymentMethodLabel,
   paymentStatusLabel,
+  productStatusLabel,
 } from "./format";
 
 describe("formatDate", () => {
@@ -41,5 +42,13 @@ describe("labels", () => {
   });
   test("label desconocido devuelve el valor crudo", () => {
     expect(orderStatusLabel("otro")).toBe("otro");
+  });
+});
+
+describe("productStatusLabel", () => {
+  test("estados de producto en español", () => {
+    expect(productStatusLabel("draft")).toBe("Borrador");
+    expect(productStatusLabel("active")).toBe("Activo");
+    expect(productStatusLabel("archived")).toBe("Archivado");
   });
 });

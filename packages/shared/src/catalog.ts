@@ -51,3 +51,7 @@ export const productAdminQuerySchema = z.object({
 });
 
 export type ProductAdminQuery = z.infer<typeof productAdminQuerySchema>;
+
+/** Array de estados de producto (para selects del front sin tocar @avanzar/db). */
+export const PRODUCT_STATUSES: readonly (typeof productStatus.enumValues)[number][] =
+  productStatus.enumValues;

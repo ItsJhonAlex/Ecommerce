@@ -1,4 +1,4 @@
-import { Banknote, LogOut, Package } from "lucide-react";
+import { Banknote, Boxes, LogOut, Package } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/orders", label: "Pedidos", icon: Package },
   { to: "/payments", label: "Pagos", icon: Banknote },
+  { to: "/products", label: "Productos", icon: Boxes },
 ];
 
 /** Shell autenticado: sidebar de navegación + sesión + tema. */

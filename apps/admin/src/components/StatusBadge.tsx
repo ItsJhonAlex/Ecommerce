@@ -1,7 +1,7 @@
-import { orderStatusLabel, paymentStatusLabel } from "@/lib/format";
+import { orderStatusLabel, paymentStatusLabel, productStatusLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Props = { kind: "order" | "payment"; status: string };
+type Props = { kind: "order" | "payment" | "product"; status: string };
 
 /** Familia de color semántica por estado (ambos modos). */
 const FAMILIES: Record<string, string> = {
@@ -26,6 +26,12 @@ const FAMILIES: Record<string, string> = {
     "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25",
   rejected:
     "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25",
+  // Productos
+  draft:
+    "bg-zinc-100 text-zinc-600 ring-zinc-500/20 dark:bg-zinc-400/10 dark:text-zinc-300 dark:ring-zinc-400/20",
+  active:
+    "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/25",
+  archived: "bg-muted text-muted-foreground ring-border",
 };
 
 const FALLBACK = "bg-muted text-muted-foreground ring-border";
@@ -33,7 +39,11 @@ const FALLBACK = "bg-muted text-muted-foreground ring-border";
 /** Badge de estado para pedidos o pagos, con label en español y color semántico. */
 export function StatusBadge({ kind, status }: Props) {
   const label =
-    kind === "order" ? orderStatusLabel(status) : paymentStatusLabel(status);
+    kind === "order"
+      ? orderStatusLabel(status)
+      : kind === "payment"
+        ? paymentStatusLabel(status)
+        : productStatusLabel(status);
   return (
     <span
       data-status={status}

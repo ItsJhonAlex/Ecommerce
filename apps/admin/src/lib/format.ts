@@ -44,3 +44,13 @@ export function paymentStatusLabel(s: string): string {
 export function paymentMethodLabel(m: string): string {
   return PAYMENT_METHOD_LABELS[m] ?? m;
 }
+
+const PRODUCT_STATUS_LABELS: Record<string, string> = {
+  draft: "Borrador",
+  active: "Activo",
+  archived: "Archivado",
+};
+
+export function productStatusLabel(s: string): string {
+  return PRODUCT_STATUS_LABELS[s] ?? s;
+}

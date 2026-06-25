@@ -5,6 +5,9 @@ import { RequireAdmin } from "@/features/auth/RequireAdmin";
 import { OrderDetailPage } from "@/features/orders/OrderDetailPage";
 import { OrdersListPage } from "@/features/orders/OrdersListPage";
 import { PaymentsListPage } from "@/features/payments/PaymentsListPage";
+import { ProductCreatePage } from "@/features/products/ProductCreatePage";
+import { ProductEditorPage } from "@/features/products/ProductEditorPage";
+import { ProductsListPage } from "@/features/products/ProductsListPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -19,6 +22,9 @@ export const router = createBrowserRouter([
           { path: "orders", element: <OrdersListPage /> },
           { path: "orders/:id", element: <OrderDetailPage /> },
           { path: "payments", element: <PaymentsListPage /> },
+          { path: "products", element: <ProductsListPage /> },
+          { path: "products/new", element: <ProductCreatePage /> },
+          { path: "products/:id", element: <ProductEditorPage /> },
         ],
       },
     ],

@@ -1,4 +1,12 @@
-import { Banknote, Boxes, LogOut, Package } from "lucide-react";
+import {
+  Banknote,
+  Boxes,
+  FolderTree,
+  LogOut,
+  Package,
+  Truck,
+  Users,
+} from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -10,6 +18,20 @@ const NAV = [
   { to: "/payments", label: "Pagos", icon: Banknote },
   { to: "/products", label: "Productos", icon: Boxes },
 ];
+
+const CONFIG_NAV = [
+  { to: "/categories", label: "Categorías", icon: FolderTree },
+  { to: "/shipping", label: "Envíos", icon: Truck },
+  { to: "/users", label: "Usuarios", icon: Users },
+];
+
+const navItemClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+    isActive
+      ? "bg-accent text-accent-foreground"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+  );
 
 /** Shell autenticado: sidebar de navegación + sesión + tema. */
 export function Layout() {
@@ -38,18 +60,17 @@ export function Layout() {
 
         <nav className="flex flex-1 flex-col gap-0.5 px-3 py-2">
           {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )
-              }
-            >
+            <NavLink key={item.to} to={item.to} className={navItemClass}>
+              <item.icon className="size-4" />
+              {item.label}
+            </NavLink>
+          ))}
+
+          <p className="px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+            Configuración
+          </p>
+          {CONFIG_NAV.map((item) => (
+            <NavLink key={item.to} to={item.to} className={navItemClass}>
               <item.icon className="size-4" />
               {item.label}
             </NavLink>

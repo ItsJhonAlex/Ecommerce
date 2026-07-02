@@ -3,6 +3,7 @@ import { shippingRates } from "@avanzar/db/schema";
 import { shippingRateInsertSchema } from "@avanzar/shared";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { isUniqueViolation } from "../../../lib/db-errors";
 import { fail } from "../../../lib/responses";
 import { parseJson } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
@@ -19,8 +20,17 @@ adminShippingRatesRouter.get("/", async (c) => {
 adminShippingRatesRouter.post("/", async (c) => {
   const parsed = await parseJson(c, shippingRateInsertSchema);
   if (!parsed.ok) return parsed.response;
-  const [created] = await db.insert(shippingRates).values(parsed.data).returning();
-  return c.json({ shippingRate: created }, 201);
+  try {
+    const [created] = await db.insert(shippingRates).values(parsed.data).returning();
+    return c.json({ shippingRate: created }, 201);
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      return fail(c, 409, "Ya existe una tarifa para esa provincia y moneda", {
+        code: "SHIPPING_RATE_EXISTS",
+      });
+    }
+    throw e;
+  }
 });
 
 // PATCH /api/v1/admin/shipping-rates/:id
@@ -28,13 +38,22 @@ adminShippingRatesRouter.patch("/:id", async (c) => {
   const id = c.req.param("id");
   const parsed = await parseJson(c, shippingRateInsertSchema.partial());
   if (!parsed.ok) return parsed.response;
-  const [updated] = await db
-    .update(shippingRates)
-    .set(parsed.data)
-    .where(eq(shippingRates.id, id))
-    .returning();
-  if (!updated) return fail(c, 404, "Tarifa no encontrada");
-  return c.json({ shippingRate: updated });
+  try {
+    const [updated] = await db
+      .update(shippingRates)
+      .set(parsed.data)
+      .where(eq(shippingRates.id, id))
+      .returning();
+    if (!updated) return fail(c, 404, "Tarifa no encontrada");
+    return c.json({ shippingRate: updated });
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      return fail(c, 409, "Ya existe una tarifa para esa provincia y moneda", {
+        code: "SHIPPING_RATE_EXISTS",
+      });
+    }
+    throw e;
+  }
 });
 
 // DELETE /api/v1/admin/shipping-rates/:id

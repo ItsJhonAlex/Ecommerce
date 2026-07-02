@@ -6,6 +6,7 @@ import {
   paymentMethodLabel,
   paymentStatusLabel,
   productStatusLabel,
+  userRoleLabel,
 } from "./format";
 
 describe("formatDate", () => {
@@ -50,5 +51,13 @@ describe("productStatusLabel", () => {
     expect(productStatusLabel("draft")).toBe("Borrador");
     expect(productStatusLabel("active")).toBe("Activo");
     expect(productStatusLabel("archived")).toBe("Archivado");
+  });
+});
+
+describe("userRoleLabel", () => {
+  test("roles en español", () => {
+    expect(userRoleLabel("customer")).toBe("Cliente");
+    expect(userRoleLabel("staff")).toBe("Staff");
+    expect(userRoleLabel("admin")).toBe("Admin");
   });
 });

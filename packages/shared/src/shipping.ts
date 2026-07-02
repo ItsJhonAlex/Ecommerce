@@ -18,3 +18,23 @@ export const shippingRateQuerySchema = z.object({
 export type ShippingRate = z.infer<typeof shippingRateSelectSchema>;
 export type ShippingRateInput = z.infer<typeof shippingRateInsertSchema>;
 export type ShippingRateQuery = z.infer<typeof shippingRateQuerySchema>;
+
+/** Provincias de Cuba (lista canónica para el dropdown de tarifas de envío). */
+export const CUBA_PROVINCES = [
+  "Pinar del Río",
+  "Artemisa",
+  "La Habana",
+  "Mayabeque",
+  "Matanzas",
+  "Cienfuegos",
+  "Villa Clara",
+  "Sancti Spíritus",
+  "Ciego de Ávila",
+  "Camagüey",
+  "Las Tunas",
+  "Holguín",
+  "Granma",
+  "Santiago de Cuba",
+  "Guantánamo",
+  "Isla de la Juventud",
+] as const;

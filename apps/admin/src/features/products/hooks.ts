@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ProductInput } from "@avanzar/shared";
 import { apiFetch } from "@/lib/api";
-import type { Category, Product, ProductListItem } from "./types";
+import type { Product, ProductListItem } from "./types";
 
 const BASE = "/api/v1/admin/products";
 
@@ -32,16 +32,7 @@ export function useProduct(id: string | undefined) {
   });
 }
 
-/** Categorías existentes (para vincular). */
-export function useCategories() {
-  return useQuery({
-    queryKey: ["categories"],
-    queryFn: () =>
-      apiFetch<{ categories: Category[] }>("/api/v1/admin/categories").then(
-        (r) => r.categories,
-      ),
-  });
-}
+export { useCategories } from "@/features/categories/hooks";
 
 export function useCreateProduct() {
   const qc = useQueryClient();

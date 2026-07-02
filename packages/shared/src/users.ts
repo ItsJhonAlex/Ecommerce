@@ -22,3 +22,7 @@ export type AdminRole = (typeof ADMIN_ROLES)[number];
 export function isAdminRole(role: string | null | undefined): boolean {
   return role != null && (ADMIN_ROLES as readonly string[]).includes(role);
 }
+
+/** Roles de usuario (para selects del front sin tocar @avanzar/db). */
+export const USER_ROLES: readonly (typeof userRole.enumValues)[number][] =
+  userRole.enumValues;

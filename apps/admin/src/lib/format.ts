@@ -1,9 +1,14 @@
-/** Formatea centavos a importe con símbolo de moneda. */
+/** Formatea centavos a importe con símbolo de moneda. Defensivo: un código de
+ * moneda inválido no debe romper el render (Intl.NumberFormat lanza RangeError). */
 export function money(minor: number, currency: string): string {
-  return new Intl.NumberFormat("es", {
-    style: "currency",
-    currency,
-  }).format(minor / 100);
+  try {
+    return new Intl.NumberFormat("es", {
+      style: "currency",
+      currency,
+    }).format(minor / 100);
+  } catch {
+    return `${(minor / 100).toFixed(2)} ${currency}`.trim();
+  }
 }
 
 /** Formatea una fecha ISO a fecha+hora local corta. */
@@ -53,4 +58,14 @@ const PRODUCT_STATUS_LABELS: Record<string, string> = {
 
 export function productStatusLabel(s: string): string {
   return PRODUCT_STATUS_LABELS[s] ?? s;
+}
+
+const USER_ROLE_LABELS: Record<string, string> = {
+  customer: "Cliente",
+  staff: "Staff",
+  admin: "Admin",
+};
+
+export function userRoleLabel(s: string): string {
+  return USER_ROLE_LABELS[s] ?? s;
 }

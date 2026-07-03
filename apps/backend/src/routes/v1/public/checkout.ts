@@ -55,26 +55,40 @@ checkoutRouter.post("/", async (c) => {
     throw e;
   }
 
-  // Tarifa de envío para la provincia destino.
-  const [rate] = await db
-    .select()
-    .from(shippingRates)
-    .where(
-      and(
-        eq(shippingRates.province, input.recipient.province),
-        eq(shippingRates.currency, input.currency),
-        eq(shippingRates.active, true),
-      ),
-    )
-    .limit(1);
-  if (!rate) {
-    return fail(c, 422, "SHIPPING_NOT_SUPPORTED", {
-      code: "SHIPPING_NOT_SUPPORTED",
-      province: input.recipient.province,
-    });
+  // Envío según método de entrega. Retiro: sin tarifa, envío 0, dirección null.
+  let shippingMinor = 0;
+  let shipProvince: string | null = null;
+  let shipMunicipality: string | null = null;
+  let shipAddressLine: string | null = null;
+  let shipReference: string | null = null;
+
+  if (input.fulfillment === "delivery") {
+    const [rate] = await db
+      .select()
+      .from(shippingRates)
+      .where(
+        and(
+          eq(shippingRates.province, input.recipient.province as string),
+          eq(shippingRates.currency, input.currency),
+          eq(shippingRates.active, true),
+        ),
+      )
+      .limit(1);
+    if (!rate) {
+      return fail(c, 422, "SHIPPING_NOT_SUPPORTED", {
+        code: "SHIPPING_NOT_SUPPORTED",
+        province: input.recipient.province,
+      });
+    }
+    shippingMinor = rate.amountMinor;
+    // El superRefine del schema garantiza estos campos en delivery.
+    shipProvince = input.recipient.province as string;
+    shipMunicipality = input.recipient.municipality as string;
+    shipAddressLine = input.recipient.addressLine as string;
+    shipReference = input.recipient.reference ?? null;
   }
 
-  const totals = computeOrderTotals(lines, rate.amountMinor);
+  const totals = computeOrderTotals(lines, shippingMinor);
 
   // La transacción se reintenta si el order_number aleatorio colisiona (unique).
   // Cada intento regenera el número; el rollback revierte el decremento de stock.
@@ -111,16 +125,17 @@ checkoutRouter.post("/", async (c) => {
             orderNumber,
             userId,
             status: "pending_payment",
+            fulfillment: input.fulfillment,
             currency: input.currency,
             buyerName: input.buyer.name,
             buyerEmail: input.buyer.email,
             buyerPhone: input.buyer.phone,
             shipRecipient: input.recipient.name,
             shipPhone: input.recipient.phone,
-            shipProvince: input.recipient.province,
-            shipMunicipality: input.recipient.municipality,
-            shipAddressLine: input.recipient.addressLine,
-            shipReference: input.recipient.reference ?? null,
+            shipProvince,
+            shipMunicipality,
+            shipAddressLine,
+            shipReference,
             subtotalMinor: totals.subtotalMinor,
             shippingMinor: totals.shippingMinor,
             discountMinor: totals.discountMinor,

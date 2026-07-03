@@ -109,6 +109,7 @@ export async function seedShippingRate(over: {
 export function checkoutBody(productId: string, quantity = 2) {
   return {
     currency: "USD",
+    fulfillment: "delivery" as const,
     buyer: { name: "Ana", email: "ana@example.com", phone: "+1555" },
     recipient: {
       name: "Luis",

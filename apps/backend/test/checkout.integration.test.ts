@@ -72,3 +72,91 @@ describe("POST /api/v1/checkout", () => {
     expect(((await res.json()) as Record<string, unknown>).code).toBe("PRICE_NOT_AVAILABLE");
   });
 });
+
+describe("checkout retiro/domicilio", () => {
+  test("retiro → 201, sin envío, sin dirección (sin tarifa cargada)", async () => {
+    const p = await seedProduct({ stock: 10, amountMinor: 1000 });
+    // Nota: sin seedShippingRate — el retiro no debe consultar tarifas.
+    const res = await postJson("/api/v1/checkout", {
+      currency: "USD",
+      fulfillment: "pickup",
+      buyer: { name: "Ana", email: "ana@example.com", phone: "+1555" },
+      recipient: { name: "Beto", phone: "+53555" },
+      items: [{ productId: p.id, quantity: 1 }],
+      payment: { method: "zelle" },
+    });
+    expect(res.status).toBe(201);
+    const { order } = (await res.json()) as {
+      order: {
+        fulfillment: string;
+        shippingMinor: number;
+        shipProvince: string | null;
+        totalMinor: number;
+      };
+    };
+    expect(order.fulfillment).toBe("pickup");
+    expect(order.shippingMinor).toBe(0);
+    expect(order.shipProvince).toBeNull();
+    expect(order.totalMinor).toBe(1000);
+  });
+
+  test("domicilio con tarifa → 201, envío aplicado", async () => {
+    const p = await seedProduct({ stock: 10, amountMinor: 1000 });
+    await seedShippingRate({ province: "Habana", amountMinor: 500 });
+    const res = await postJson("/api/v1/checkout", {
+      currency: "USD",
+      fulfillment: "delivery",
+      buyer: { name: "Ana", email: "ana@example.com", phone: "+1555" },
+      recipient: {
+        name: "Beto",
+        phone: "+53555",
+        province: "Habana",
+        municipality: "Centro",
+        addressLine: "Calle 1",
+      },
+      items: [{ productId: p.id, quantity: 1 }],
+      payment: { method: "zelle" },
+    });
+    expect(res.status).toBe(201);
+    const { order } = (await res.json()) as {
+      order: { fulfillment: string; shippingMinor: number; totalMinor: number };
+    };
+    expect(order.fulfillment).toBe("delivery");
+    expect(order.shippingMinor).toBe(500);
+    expect(order.totalMinor).toBe(1500);
+  });
+
+  test("domicilio sin tarifa → 422 SHIPPING_NOT_SUPPORTED", async () => {
+    const p = await seedProduct({ stock: 10, amountMinor: 1000 });
+    // sin seedShippingRate
+    const res = await postJson("/api/v1/checkout", {
+      currency: "USD",
+      fulfillment: "delivery",
+      buyer: { name: "Ana", email: "ana@example.com", phone: "+1555" },
+      recipient: {
+        name: "Beto",
+        phone: "+53555",
+        province: "Habana",
+        municipality: "Centro",
+        addressLine: "Calle 1",
+      },
+      items: [{ productId: p.id, quantity: 1 }],
+      payment: { method: "zelle" },
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("SHIPPING_NOT_SUPPORTED");
+  });
+
+  test("domicilio sin dirección → 400 de validación", async () => {
+    const p = await seedProduct({ stock: 10, amountMinor: 1000 });
+    const res = await postJson("/api/v1/checkout", {
+      currency: "USD",
+      fulfillment: "delivery",
+      buyer: { name: "Ana", email: "ana@example.com", phone: "+1555" },
+      recipient: { name: "Beto", phone: "+53555" },
+      items: [{ productId: p.id, quantity: 1 }],
+      payment: { method: "zelle" },
+    });
+    expect(res.status).toBe(400);
+  });
+});

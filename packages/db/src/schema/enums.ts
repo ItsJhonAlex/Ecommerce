@@ -33,3 +33,6 @@ export const paymentStatus = pgEnum("payment_status", [
   "confirmed",
   "rejected",
 ]);
+
+/** Método de entrega: retiro en el local o envío a domicilio. */
+export const fulfillmentMethod = pgEnum("fulfillment_method", ["pickup", "delivery"]);

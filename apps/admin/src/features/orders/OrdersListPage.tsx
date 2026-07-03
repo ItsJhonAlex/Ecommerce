@@ -6,7 +6,7 @@ import type { Column } from "@/components/DataTable";
 import { filterSelectClass, PageHeader } from "@/components/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "@/components/states";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatDate, money, orderStatusLabel } from "@/lib/format";
+import { formatDate, fulfillmentLabel, money, orderStatusLabel } from "@/lib/format";
 import { useOrders } from "./hooks";
 import type { OrderListItem } from "./types";
 
@@ -31,6 +31,15 @@ const columns: Column<OrderListItem>[] = [
     key: "status",
     header: "Estado",
     render: (o) => <StatusBadge kind="order" status={o.status} />,
+  },
+  {
+    key: "fulfillment",
+    header: "Entrega",
+    render: (o: OrderListItem) => (
+      <span className="text-xs text-muted-foreground">
+        {fulfillmentLabel(o.fulfillment)}
+      </span>
+    ),
   },
   {
     key: "date",

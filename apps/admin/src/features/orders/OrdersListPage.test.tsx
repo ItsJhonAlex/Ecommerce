@@ -10,6 +10,7 @@ const order = {
   id: "o1",
   orderNumber: "AVZ-1",
   status: "paid",
+  fulfillment: "delivery",
   currency: "USD",
   buyerName: "Ana",
   totalMinor: 123456,
@@ -32,6 +33,7 @@ describe("OrdersListPage", () => {
     // también dice "Pagado". El dropdown muestra etiquetas en español.
     const badge = document.querySelector('[data-status="paid"]');
     expect(badge).toHaveTextContent("Pagado");
+    expect(screen.getByText("Domicilio")).toBeInTheDocument();
   });
 
   test("el filtro por estado vuelve a pedir con el query param", async () => {

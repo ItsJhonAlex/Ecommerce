@@ -6,6 +6,7 @@ import { ErrorState, LoadingState } from "@/components/states";
 import { Card } from "@/components/ui/card";
 import {
   formatDate,
+  fulfillmentLabel,
   money,
   paymentMethodLabel,
   paymentStatusLabel,
@@ -56,7 +57,12 @@ export function OrderDetailPage() {
               {order.orderNumber}
             </span>
           </h2>
-          <StatusBadge kind="order" status={order.status} />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+              {fulfillmentLabel(order.fulfillment)}
+            </span>
+            <StatusBadge kind="order" status={order.status} />
+          </div>
         </div>
       </div>
 
@@ -74,23 +80,30 @@ export function OrderDetailPage() {
       <div className="grid gap-5 lg:grid-cols-2">
         <Card className="space-y-4 p-6">
           <h3 className="font-display text-base font-semibold">
-            Comprador y envío
+            {order.fulfillment === "pickup" ? "Comprador y retiro" : "Comprador y envío"}
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Comprador" value={order.buyerName} />
             <Field label="Email" value={order.buyerEmail} />
             <Field label="Teléfono" value={order.buyerPhone} />
-            <Field label="Destinatario" value={order.shipRecipient} />
+            <Field
+              label={order.fulfillment === "pickup" ? "Retira" : "Destinatario"}
+              value={order.shipRecipient}
+            />
           </div>
-          <div className="border-t pt-4 text-sm text-muted-foreground">
-            <p>{order.shipAddressLine}</p>
-            <p>
-              {order.shipMunicipality}, {order.shipProvince}
-            </p>
-            {order.shipReference && (
-              <p className="mt-1">Ref: {order.shipReference}</p>
-            )}
-          </div>
+          {order.fulfillment === "pickup" ? (
+            <div className="border-t pt-4 text-sm text-muted-foreground">
+              <p>Retiro en el local · Tel: {order.shipPhone}</p>
+            </div>
+          ) : (
+            <div className="border-t pt-4 text-sm text-muted-foreground">
+              <p>{order.shipAddressLine}</p>
+              <p>
+                {order.shipMunicipality}, {order.shipProvince}
+              </p>
+              {order.shipReference && <p className="mt-1">Ref: {order.shipReference}</p>}
+            </div>
+          )}
         </Card>
 
         <Card className="space-y-3 p-6">
@@ -113,10 +126,12 @@ export function OrderDetailPage() {
               <dt>Subtotal</dt>
               <dd>{money(order.subtotalMinor, order.currency)}</dd>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <dt>Envío</dt>
-              <dd>{money(order.shippingMinor, order.currency)}</dd>
-            </div>
+            {order.fulfillment === "delivery" && (
+              <div className="flex justify-between text-muted-foreground">
+                <dt>Envío</dt>
+                <dd>{money(order.shippingMinor, order.currency)}</dd>
+              </div>
+            )}
             {order.discountMinor > 0 && (
               <div className="flex justify-between text-muted-foreground">
                 <dt>Descuento</dt>

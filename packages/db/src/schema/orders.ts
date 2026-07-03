@@ -1,7 +1,7 @@
 import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { products } from "./catalog";
-import { orderStatus } from "./enums";
+import { fulfillmentMethod, orderStatus } from "./enums";
 
 /**
  * Pedido. Acá vive la distinción comprador ≠ destinatario.
@@ -16,6 +16,7 @@ export const orders = pgTable("orders", {
   orderNumber: text("order_number").notNull().unique(),
   userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
   status: orderStatus("status").notNull().default("pending_payment"),
+  fulfillment: fulfillmentMethod("fulfillment").notNull().default("delivery"),
   currency: text("currency").notNull(),
 
   // Comprador (snapshot) — quien paga.
@@ -26,9 +27,9 @@ export const orders = pgTable("orders", {
   // Destinatario (snapshot inmutable) — quien recibe en Cuba.
   shipRecipient: text("ship_recipient").notNull(),
   shipPhone: text("ship_phone").notNull(),
-  shipProvince: text("ship_province").notNull(),
-  shipMunicipality: text("ship_municipality").notNull(),
-  shipAddressLine: text("ship_address_line").notNull(),
+  shipProvince: text("ship_province"),
+  shipMunicipality: text("ship_municipality"),
+  shipAddressLine: text("ship_address_line"),
   shipReference: text("ship_reference"),
 
   // Montos en centavos.

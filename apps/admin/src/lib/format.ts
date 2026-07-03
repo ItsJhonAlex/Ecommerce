@@ -69,3 +69,12 @@ const USER_ROLE_LABELS: Record<string, string> = {
 export function userRoleLabel(s: string): string {
   return USER_ROLE_LABELS[s] ?? s;
 }
+
+const FULFILLMENT_LABELS: Record<string, string> = {
+  pickup: "Retiro",
+  delivery: "Domicilio",
+};
+
+export function fulfillmentLabel(m: string): string {
+  return FULFILLMENT_LABELS[m] ?? m;
+}

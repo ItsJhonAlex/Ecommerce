@@ -12,6 +12,7 @@ function makeOrder(status: string) {
     id: "o1",
     orderNumber: "AVZ-1",
     status,
+    fulfillment: "delivery",
     currency: "USD",
     buyerName: "Ana",
     buyerEmail: "ana@x.com",
@@ -92,5 +93,35 @@ describe("OrderDetailPage", () => {
     renderDetail();
     await userEvent.click(await screen.findByRole("button", { name: "Preparando" }));
     expect(await screen.findByText(/cambió de estado/i)).toBeInTheDocument();
+  });
+
+  test("pickup: muestra Retiro, contacto y oculta dirección", async () => {
+    server.use(
+      http.get("/api/v1/admin/orders/o1", () =>
+        HttpResponse.json({
+          order: {
+            ...makeOrder("paid"),
+            fulfillment: "pickup",
+            shipProvince: null,
+            shipMunicipality: null,
+            shipAddressLine: null,
+          },
+        }),
+      ),
+    );
+    renderDetail();
+    expect(await screen.findByText("Retiro")).toBeInTheDocument();
+    expect(screen.queryByText(/Calle 1/)).not.toBeInTheDocument();
+  });
+
+  test("delivery: muestra Domicilio y la dirección", async () => {
+    server.use(
+      http.get("/api/v1/admin/orders/o1", () =>
+        HttpResponse.json({ order: { ...makeOrder("paid"), fulfillment: "delivery" } }),
+      ),
+    );
+    renderDetail();
+    expect(await screen.findByText("Domicilio")).toBeInTheDocument();
+    expect(screen.getByText(/Calle 1/)).toBeInTheDocument();
   });
 });

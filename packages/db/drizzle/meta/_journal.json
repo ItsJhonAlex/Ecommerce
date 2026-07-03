@@ -22,6 +22,13 @@
       "when": 1783112089418,
       "tag": "0002_dapper_mikhail_rasputin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783118316494,
+      "tag": "0003_abandoned_red_hulk",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import {
   FolderTree,
   LogOut,
   Package,
+  Store,
   Truck,
   Users,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const NAV = [
 ];
 
 const CONFIG_NAV = [
+  { to: "/settings", label: "Negocio", icon: Store },
   { to: "/categories", label: "Categorías", icon: FolderTree },
   { to: "/shipping", label: "Envíos", icon: Truck },
   { to: "/users", label: "Usuarios", icon: Users },

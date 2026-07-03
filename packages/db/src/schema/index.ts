@@ -19,5 +19,8 @@ export * from "./payments";
 // Envío (lookup)
 export * from "./shipping";
 
+// Ajustes del negocio (singleton)
+export * from "./store-settings";
+
 // Relaciones (query API)
 export * from "./relations";

@@ -125,6 +125,18 @@ describe("OrderDetailPage", () => {
     expect(screen.getByText(/Calle 1/)).toBeInTheDocument();
   });
 
+  test("expone un link 'Recibo' que abre el PDF del pedido en otra pestaña", async () => {
+    server.use(
+      http.get("/api/v1/admin/orders/o1", () =>
+        HttpResponse.json({ order: makeOrder("paid") }),
+      ),
+    );
+    renderDetail();
+    const link = await screen.findByRole("link", { name: /recibo/i });
+    expect(link).toHaveAttribute("href", "/api/v1/admin/orders/o1/receipt");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
   test("pickup: el pipeline muestra 'Listo para retirar' y 'Retirado'", async () => {
     server.use(
       http.get("/api/v1/admin/orders/o1", () =>

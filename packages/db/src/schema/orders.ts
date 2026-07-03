@@ -38,6 +38,9 @@ export const orders = pgTable("orders", {
   discountMinor: integer("discount_minor").notNull().default(0),
   totalMinor: integer("total_minor").notNull(),
 
+  // Token opaco no adivinable para el acceso público al recibo.
+  receiptToken: uuid("receipt_token").notNull().defaultRandom(),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

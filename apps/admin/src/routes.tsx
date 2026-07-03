@@ -9,6 +9,7 @@ import { PaymentsListPage } from "@/features/payments/PaymentsListPage";
 import { ProductCreatePage } from "@/features/products/ProductCreatePage";
 import { ProductEditorPage } from "@/features/products/ProductEditorPage";
 import { ProductsListPage } from "@/features/products/ProductsListPage";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 import { ShippingPage } from "@/features/shipping/ShippingPage";
 import { UsersPage } from "@/features/users/UsersPage";
 
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
           { path: "products/:id", element: <ProductEditorPage /> },
           { path: "categories", element: <CategoriesPage /> },
           { path: "shipping", element: <ShippingPage /> },
+          { path: "settings", element: <SettingsPage /> },
           { path: "users", element: <UsersPage /> },
         ],
       },

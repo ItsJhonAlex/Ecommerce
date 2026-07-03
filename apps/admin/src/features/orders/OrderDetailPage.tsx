@@ -1,8 +1,9 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StatusPipeline } from "@/components/StatusPipeline";
 import { ErrorState, LoadingState } from "@/components/states";
+import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   formatDate,
@@ -62,6 +63,16 @@ export function OrderDetailPage() {
               {fulfillmentLabel(order.fulfillment)}
             </span>
             <StatusBadge kind="order" status={order.status} fulfillment={order.fulfillment} />
+            {/* Abre el recibo PDF en una pestaña nueva (mismo-origin vía sesión admin). */}
+            <a
+              href={`/api/v1/admin/orders/${order.id}/receipt`}
+              target="_blank"
+              rel="noopener"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <FileText className="size-4" />
+              Recibo
+            </a>
           </div>
         </div>
       </div>

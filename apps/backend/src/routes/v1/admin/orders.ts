@@ -12,6 +12,8 @@ import { fail } from "../../../lib/responses";
 import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
 import { canTransition } from "../../../services/order-status";
+import { renderReceipt } from "../../../services/receipt/render";
+import { getStoreSettings } from "../../../services/store-settings";
 
 export const adminOrdersRouter = new Hono<AuthEnv>();
 
@@ -42,6 +44,30 @@ adminOrdersRouter.get("/:id", async (c) => {
   });
   if (!order) return fail(c, 404, "Pedido no encontrado");
   return c.json({ order });
+});
+
+// GET /api/v1/admin/orders/:id/receipt — recibo del pedido en PDF.
+adminOrdersRouter.get("/:id/receipt", async (c) => {
+  const id = c.req.param("id");
+  const order = await db.query.orders.findFirst({
+    where: (o, { eq: e }) => e(o.id, id),
+    with: { items: true, payments: true },
+  });
+  if (!order) return fail(c, 404, "Pedido no encontrado");
+
+  // La orden (con items/payments) ya calza con el shape que espera renderReceipt:
+  // items expone productName/quantity/unitAmountMinor/lineTotalMinor y payments
+  // method/status. Los campos extra son inertes para el recibo.
+  const settings = await getStoreSettings();
+  const pdf = await renderReceipt(order, settings);
+
+  return new Response(pdf, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="recibo-${order.orderNumber}.pdf"`,
+    },
+  });
 });
 
 // PATCH /api/v1/admin/orders/:id/status

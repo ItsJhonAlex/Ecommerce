@@ -4,6 +4,7 @@ import { adminCategoriesRouter } from "./categories";
 import { adminOrdersRouter } from "./orders";
 import { adminPaymentsRouter } from "./payments";
 import { adminProductsRouter } from "./products";
+import { adminSettingsRouter } from "./settings";
 import { adminShippingRatesRouter } from "./shipping-rates";
 import { adminUsersRouter } from "./users";
 
@@ -17,4 +18,5 @@ adminRoutes.route("/categories", adminCategoriesRouter);
 adminRoutes.route("/orders", adminOrdersRouter);
 adminRoutes.route("/payments", adminPaymentsRouter);
 adminRoutes.route("/shipping-rates", adminShippingRatesRouter);
+adminRoutes.route("/settings", adminSettingsRouter);
 adminRoutes.route("/users", adminUsersRouter);

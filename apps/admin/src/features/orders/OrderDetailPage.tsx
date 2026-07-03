@@ -61,14 +61,14 @@ export function OrderDetailPage() {
             <span className="rounded-full border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
               {fulfillmentLabel(order.fulfillment)}
             </span>
-            <StatusBadge kind="order" status={order.status} />
+            <StatusBadge kind="order" status={order.status} fulfillment={order.fulfillment} />
           </div>
         </div>
       </div>
 
       {/* Héroe: el riel de avance + el control de cambio de estado. */}
       <Card className="space-y-5 p-6">
-        <StatusPipeline status={order.status} />
+        <StatusPipeline status={order.status} fulfillment={order.fulfillment} />
         <div className="border-t pt-4">
           <h3 className="mb-3 text-sm font-medium text-muted-foreground">
             Cambiar estado
@@ -177,7 +177,7 @@ export function OrderDetailPage() {
                 <span className="font-mono text-xs text-muted-foreground">
                   {formatDate(h.createdAt)}
                 </span>
-                <StatusBadge kind="order" status={h.status} />
+                <StatusBadge kind="order" status={h.status} fulfillment={order.fulfillment} />
               </li>
             ))}
           </ol>

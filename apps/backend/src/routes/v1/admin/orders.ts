@@ -59,7 +59,7 @@ adminOrdersRouter.patch("/:id/status", async (c) => {
   if (existing.status === status) {
     return fail(c, 409, "El pedido ya está en ese estado");
   }
-  if (!canTransition(existing.status, status)) {
+  if (!canTransition(existing.status, status, existing.fulfillment)) {
     return fail(c, 422, "INVALID_TRANSITION", {
       code: "INVALID_TRANSITION",
       from: existing.status,

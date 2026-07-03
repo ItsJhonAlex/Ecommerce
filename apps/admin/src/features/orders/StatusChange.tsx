@@ -1,4 +1,4 @@
-import { ALLOWED_TRANSITIONS, type OrderStatus } from "@avanzar/shared";
+import { allowedTransitions, type OrderStatus } from "@avanzar/shared";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import type { Order } from "./types";
 
 /** Botonera de transiciones permitidas para el estado actual del pedido. */
 export function StatusChange({ order }: { order: Order }) {
-  const allowed = ALLOWED_TRANSITIONS[order.status];
+  const allowed = allowedTransitions(order.fulfillment, order.status);
   const mutation = useUpdateOrderStatus(order.id);
   const [inlineError, setInlineError] = useState<string | null>(null);
 
@@ -23,7 +23,8 @@ export function StatusChange({ order }: { order: Order }) {
       return;
     }
     mutation.mutate(to, {
-      onSuccess: () => toast.success(`Pedido → ${orderStatusLabel(to)}`),
+      onSuccess: () =>
+        toast.success(`Pedido → ${orderStatusLabel(to, order.fulfillment)}`),
       onError: (e) => {
         if (e instanceof ApiError && e.status === 422) {
           setInlineError(e.message);
@@ -44,7 +45,7 @@ export function StatusChange({ order }: { order: Order }) {
             disabled={mutation.isPending}
             onClick={() => changeTo(to)}
           >
-            {orderStatusLabel(to)}
+            {orderStatusLabel(to, order.fulfillment)}
           </Button>
         ))}
       </div>

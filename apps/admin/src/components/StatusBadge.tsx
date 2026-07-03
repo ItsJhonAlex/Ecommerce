@@ -6,7 +6,11 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Props = { kind: "order" | "payment" | "product" | "user"; status: string };
+type Props = {
+  kind: "order" | "payment" | "product" | "user";
+  status: string;
+  fulfillment?: string;
+};
 
 /** Familia de color semántica por estado (ambos modos). */
 const FAMILIES: Record<string, string> = {
@@ -26,6 +30,7 @@ const FAMILIES: Record<string, string> = {
     "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/25",
   delivered:
     "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/25",
+  ready_for_pickup: "bg-primary/10 text-primary ring-primary/25",
   // Negativo
   cancelled:
     "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25",
@@ -47,10 +52,10 @@ const FAMILIES: Record<string, string> = {
 const FALLBACK = "bg-muted text-muted-foreground ring-border";
 
 /** Badge para estado de pedido/pago/producto o rol de usuario, con label en español y color semántico. */
-export function StatusBadge({ kind, status }: Props) {
+export function StatusBadge({ kind, status, fulfillment }: Props) {
   const label =
     kind === "order"
-      ? orderStatusLabel(status)
+      ? orderStatusLabel(status, fulfillment)
       : kind === "payment"
         ? paymentStatusLabel(status)
         : kind === "product"

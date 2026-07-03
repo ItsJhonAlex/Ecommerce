@@ -4,7 +4,8 @@
  * import path histórico del backend.
  */
 export {
-  ALLOWED_TRANSITIONS,
+  allowedTransitions,
   canTransition,
+  type FulfillmentMethod,
   type OrderStatus,
 } from "@avanzar/shared";

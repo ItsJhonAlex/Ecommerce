@@ -24,6 +24,7 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   paid: "Pagado",
   preparing: "Preparando",
   shipped: "Enviado",
+  ready_for_pickup: "Listo para retirar",
   delivered: "Entregado",
   cancelled: "Cancelado",
 };
@@ -40,7 +41,8 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   zelle: "Zelle",
 };
 
-export function orderStatusLabel(s: string): string {
+export function orderStatusLabel(s: string, fulfillment?: string): string {
+  if (s === "delivered" && fulfillment === "pickup") return "Retirado";
   return ORDER_STATUS_LABELS[s] ?? s;
 }
 export function paymentStatusLabel(s: string): string {

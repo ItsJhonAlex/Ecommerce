@@ -124,4 +124,19 @@ describe("OrderDetailPage", () => {
     expect(await screen.findByText("Domicilio")).toBeInTheDocument();
     expect(screen.getByText(/Calle 1/)).toBeInTheDocument();
   });
+
+  test("pickup: el pipeline muestra 'Listo para retirar' y 'Retirado'", async () => {
+    server.use(
+      http.get("/api/v1/admin/orders/o1", () =>
+        HttpResponse.json({
+          order: { ...makeOrder("ready_for_pickup"), fulfillment: "pickup", shipProvince: null, shipMunicipality: null, shipAddressLine: null },
+        }),
+      ),
+    );
+    renderDetail();
+    // "Listo para retirar" aparece en el badge de cabecera, el paso actual del
+    // pipeline y el badge del historial — todos comparten el mismo label.
+    expect((await screen.findAllByText("Listo para retirar")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Retirado").length).toBeGreaterThan(0);
+  });
 });

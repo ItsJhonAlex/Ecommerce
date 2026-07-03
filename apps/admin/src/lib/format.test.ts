@@ -44,6 +44,12 @@ describe("labels", () => {
   test("label desconocido devuelve el valor crudo", () => {
     expect(orderStatusLabel("otro")).toBe("otro");
   });
+  test("delivered según método + ready_for_pickup", () => {
+    expect(orderStatusLabel("delivered", "pickup")).toBe("Retirado");
+    expect(orderStatusLabel("delivered", "delivery")).toBe("Entregado");
+    expect(orderStatusLabel("delivered")).toBe("Entregado");
+    expect(orderStatusLabel("ready_for_pickup")).toBe("Listo para retirar");
+  });
 });
 
 describe("productStatusLabel", () => {

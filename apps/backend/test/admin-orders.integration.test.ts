@@ -13,6 +13,30 @@ import {
   signUp,
 } from "./helpers";
 
+/** Crea una orden de RETIRO vía checkout (sin dirección) y devuelve su id. */
+async function createPickupOrder(qty = 1): Promise<string> {
+  const p = await seedProduct({ stock: 10 });
+  const res = await postJson("/api/v1/checkout", {
+    currency: "USD",
+    fulfillment: "pickup",
+    buyer: { name: "Ana", email: "ana@example.com", phone: "+1555" },
+    recipient: { name: "Beto", phone: "+53555" },
+    items: [{ productId: p.id, quantity: qty }],
+    payment: { method: "zelle" },
+  });
+  const body = (await res.json()) as { order: { id: string } };
+  return body.order.id;
+}
+
+/** PATCH del estado de una orden por id. */
+function patchStatus(cookie: string, orderId: string, status: string): Promise<Response> {
+  return request(`/api/v1/admin/orders/${orderId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ status }),
+  });
+}
+
 beforeEach(async () => {
   await resetDb();
 });
@@ -110,5 +134,26 @@ describe("PATCH /api/v1/admin/orders/:id/status", () => {
     // Restock: 7 + 3 = 10.
     [row] = await db.select().from(products).where(eq(products.id, p.id));
     expect(row?.stockQuantity).toBe(10);
+  });
+});
+
+describe("PATCH estado — camino de retiro", () => {
+  test("retiro: preparing → ready_for_pickup → delivered", async () => {
+    const cookie = await adminCookie();
+    const orderId = await createPickupOrder();
+    expect((await patchStatus(cookie, orderId, "paid")).status).toBe(200);
+    expect((await patchStatus(cookie, orderId, "preparing")).status).toBe(200);
+    expect((await patchStatus(cookie, orderId, "ready_for_pickup")).status).toBe(200);
+    expect((await patchStatus(cookie, orderId, "delivered")).status).toBe(200);
+  });
+
+  test("retiro: preparing → shipped → 422 INVALID_TRANSITION", async () => {
+    const cookie = await adminCookie();
+    const orderId = await createPickupOrder();
+    await patchStatus(cookie, orderId, "paid");
+    await patchStatus(cookie, orderId, "preparing");
+    const res = await patchStatus(cookie, orderId, "shipped");
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("INVALID_TRANSITION");
   });
 });

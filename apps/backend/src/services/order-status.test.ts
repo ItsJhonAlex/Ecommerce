@@ -1,37 +1,41 @@
 import { describe, expect, test } from "bun:test";
-import { ALLOWED_TRANSITIONS, canTransition } from "./order-status";
+import { allowedTransitions, canTransition } from "./order-status";
 
-describe("canTransition", () => {
-  test("permite el avance hacia adelante de la cadena", () => {
-    expect(canTransition("pending_payment", "paid")).toBe(true);
-    expect(canTransition("paid", "preparing")).toBe(true);
-    expect(canTransition("preparing", "shipped")).toBe(true);
-    expect(canTransition("shipped", "delivered")).toBe(true);
+describe("canTransition — domicilio", () => {
+  test("camino de domicilio", () => {
+    expect(canTransition("pending_payment", "paid", "delivery")).toBe(true);
+    expect(canTransition("paid", "preparing", "delivery")).toBe(true);
+    expect(canTransition("preparing", "shipped", "delivery")).toBe(true);
+    expect(canTransition("shipped", "delivered", "delivery")).toBe(true);
   });
-
-  test("permite cancelar antes de shipped", () => {
-    expect(canTransition("pending_payment", "cancelled")).toBe(true);
-    expect(canTransition("paid", "cancelled")).toBe(true);
-    expect(canTransition("preparing", "cancelled")).toBe(true);
+  test("domicilio no permite el camino de retiro", () => {
+    expect(canTransition("preparing", "delivered", "delivery")).toBe(false);
+    expect(canTransition("preparing", "ready_for_pickup", "delivery")).toBe(false);
   });
-
-  test("no permite cancelar una vez shipped o delivered", () => {
-    expect(canTransition("shipped", "cancelled")).toBe(false);
-    expect(canTransition("delivered", "cancelled")).toBe(false);
+  test("cancelable antes de shipped, no después", () => {
+    expect(canTransition("preparing", "cancelled", "delivery")).toBe(true);
+    expect(canTransition("shipped", "cancelled", "delivery")).toBe(false);
   });
+});
 
-  test("no permite retroceder en la cadena", () => {
-    expect(canTransition("paid", "pending_payment")).toBe(false);
-    expect(canTransition("shipped", "preparing")).toBe(false);
-    expect(canTransition("delivered", "shipped")).toBe(false);
+describe("canTransition — retiro", () => {
+  test("camino de retiro", () => {
+    expect(canTransition("paid", "preparing", "pickup")).toBe(true);
+    expect(canTransition("preparing", "ready_for_pickup", "pickup")).toBe(true);
+    expect(canTransition("ready_for_pickup", "delivered", "pickup")).toBe(true);
   });
-
-  test("estados terminales no tienen transiciones de salida", () => {
-    expect(ALLOWED_TRANSITIONS.delivered).toEqual([]);
-    expect(ALLOWED_TRANSITIONS.cancelled).toEqual([]);
+  test("retiro no usa shipped", () => {
+    expect(canTransition("preparing", "shipped", "pickup")).toBe(false);
   });
+  test("cancelable hasta antes de retirar", () => {
+    expect(canTransition("ready_for_pickup", "cancelled", "pickup")).toBe(true);
+    expect(canTransition("delivered", "cancelled", "pickup")).toBe(false);
+  });
+});
 
-  test("no permite transiciones al mismo estado", () => {
-    expect(canTransition("paid", "paid")).toBe(false);
+describe("allowedTransitions", () => {
+  test("por método desde preparing", () => {
+    expect(allowedTransitions("pickup", "preparing")).toEqual(["ready_for_pickup", "cancelled"]);
+    expect(allowedTransitions("delivery", "preparing")).toEqual(["shipped", "cancelled"]);
   });
 });

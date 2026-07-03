@@ -18,6 +18,7 @@ export const orderStatus = pgEnum("order_status", [
   "shipped",
   "delivered",
   "cancelled",
+  "ready_for_pickup",
 ]);
 
 /** Método de pago. */

@@ -15,6 +15,13 @@
       "when": 1783105465120,
       "tag": "0001_yummy_randall",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783112089418,
+      "tag": "0002_dapper_mikhail_rasputin",
+      "breakpoints": true
     }
   ]
 }

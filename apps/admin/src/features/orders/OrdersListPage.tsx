@@ -30,7 +30,9 @@ const columns: Column<OrderListItem>[] = [
   {
     key: "status",
     header: "Estado",
-    render: (o) => <StatusBadge kind="order" status={o.status} />,
+    render: (o) => (
+      <StatusBadge kind="order" status={o.status} fulfillment={o.fulfillment} />
+    ),
   },
   {
     key: "fulfillment",

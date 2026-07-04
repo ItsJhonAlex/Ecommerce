@@ -8,7 +8,11 @@ import { z } from "zod";
  */
 export const checkoutItemSchema = z.object({
   productId: z.uuid(),
-  quantity: z.number().int().positive(),
+  quantity: z
+    .number()
+    .int()
+    .positive()
+    .max(1000, "La cantidad no puede superar 1000 por artículo"),
 });
 
 /** Métodos de entrega (para el selector del storefront sin tocar @avanzar/db). */
@@ -36,7 +40,10 @@ export const checkoutSchema = z
       addressLine: z.string().min(1).optional(),
       reference: z.string().optional(),
     }),
-    items: z.array(checkoutItemSchema).min(1),
+    items: z
+      .array(checkoutItemSchema)
+      .min(1)
+      .max(50, "El pedido no puede tener más de 50 artículos"),
     payment: z.object({
       method: z.enum(paymentMethod.enumValues),
     }),

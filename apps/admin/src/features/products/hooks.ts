@@ -128,6 +128,19 @@ export function useUpdateImage(productId: string) {
   });
 }
 
+export function useReorderImages(productId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (imageIds: string[]) =>
+      apiFetch(`${BASE}/${productId}/images/reorder`, {
+        method: "PATCH",
+        body: JSON.stringify({ imageIds }),
+      }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["products", productId] }),
+  });
+}
+
 export function useDeleteImage(productId: string) {
   const qc = useQueryClient();
   return useMutation({

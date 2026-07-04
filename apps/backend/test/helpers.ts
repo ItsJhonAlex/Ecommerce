@@ -2,9 +2,14 @@ import { db } from "@avanzar/db";
 import { productPrices, products, shippingRates, user } from "@avanzar/db/schema";
 import { eq } from "drizzle-orm";
 import { app } from "../src/index";
+import { __resetRateLimit } from "../src/middlewares/rate-limit";
 
 /** Trunca todas las tablas entre tests para aislarlos. */
 export async function resetDb(): Promise<void> {
+  // El rate limit del checkout es un Map proceso-local que persiste entre tests
+  // del mismo archivo; sin este reset, las suites que crean muchas órdenes
+  // (checkout, receipt, admin-orders, track) acumularían hits y pegarían el 429.
+  __resetRateLimit();
   // Guard de seguridad: si por algún motivo el preload no reapuntó la conexión
   // (p. ej. correr `bun test test/` desde otro cwd, sin tomar bunfig.toml),
   // abortamos antes de truncar para NO borrar la base de desarrollo.

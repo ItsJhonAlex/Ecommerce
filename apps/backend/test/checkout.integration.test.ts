@@ -73,6 +73,26 @@ describe("POST /api/v1/checkout", () => {
   });
 });
 
+describe("checkout — cotas de entrada (M-1)", () => {
+  test("quantity > 1000 → 400 de validación", async () => {
+    const p = await seedProduct({ stock: 10 });
+    await seedShippingRate();
+    const res = await postJson("/api/v1/checkout", checkoutBody(p.id, 99999));
+    expect(res.status).toBe(400);
+  });
+
+  test("más de 50 items → 400 de validación", async () => {
+    const p = await seedProduct({ stock: 10 });
+    await seedShippingRate();
+    const body = {
+      ...checkoutBody(p.id, 1),
+      items: Array.from({ length: 51 }, () => ({ productId: p.id, quantity: 1 })),
+    };
+    const res = await postJson("/api/v1/checkout", body);
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("checkout retiro/domicilio", () => {
   test("retiro → 201, sin envío, sin dirección (sin tarifa cargada)", async () => {
     const p = await seedProduct({ stock: 10, amountMinor: 1000 });

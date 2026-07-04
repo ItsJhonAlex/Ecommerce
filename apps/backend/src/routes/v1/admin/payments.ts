@@ -4,6 +4,7 @@ import { confirmPaymentSchema, paymentListQuerySchema } from "@avanzar/shared";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
+import { uuidParam } from "../../../lib/uuid";
 import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
 
@@ -23,7 +24,7 @@ adminPaymentsRouter.get("/", async (c) => {
 });
 
 // GET /api/v1/admin/payments/:id
-adminPaymentsRouter.get("/:id", async (c) => {
+adminPaymentsRouter.get("/:id", uuidParam("id"), async (c) => {
   const id = c.req.param("id");
   const payment = await db.query.payments.findFirst({
     where: (p, { eq: e }) => e(p.id, id),
@@ -34,7 +35,7 @@ adminPaymentsRouter.get("/:id", async (c) => {
 });
 
 // PATCH /api/v1/admin/payments/:id/confirm
-adminPaymentsRouter.patch("/:id/confirm", async (c) => {
+adminPaymentsRouter.patch("/:id/confirm", uuidParam("id"), async (c) => {
   const id = c.req.param("id");
   const confirmedBy = c.var.user.id;
   const parsed = await parseJson(c, confirmPaymentSchema);

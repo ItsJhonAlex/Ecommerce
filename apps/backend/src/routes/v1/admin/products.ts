@@ -6,6 +6,7 @@ import {
   products,
 } from "@avanzar/db/schema";
 import {
+  imageReorderSchema,
   linkCategorySchema,
   productAdminQuerySchema,
   productImageInsertSchema,
@@ -16,11 +17,15 @@ import { type SQL, and, eq, ilike } from "drizzle-orm";
 import { Hono } from "hono";
 import { isUniqueViolation } from "../../../lib/db-errors";
 import { fail } from "../../../lib/responses";
+import { uuidParam } from "../../../lib/uuid";
 import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
 
 /** CRUD de productos para admin. Incluye todos los status (draft/active/archived). */
 export const adminProductsRouter = new Hono<AuthEnv>();
+
+/** Señala dentro de la transacción de reorden que el set de imágenes no coincide. */
+class ReorderError extends Error {}
 
 // GET /api/v1/admin/products?status=&q=
 adminProductsRouter.get("/", async (c) => {
@@ -41,7 +46,7 @@ adminProductsRouter.get("/", async (c) => {
 });
 
 // GET /api/v1/admin/products/:id
-adminProductsRouter.get("/:id", async (c) => {
+adminProductsRouter.get("/:id", uuidParam("id"), async (c) => {
   const id = c.req.param("id");
   const product = await db.query.products.findFirst({
     where: (p, { eq: e }) => e(p.id, id),
@@ -73,7 +78,7 @@ adminProductsRouter.post("/", async (c) => {
 });
 
 // PATCH /api/v1/admin/products/:id
-adminProductsRouter.patch("/:id", async (c) => {
+adminProductsRouter.patch("/:id", uuidParam("id"), async (c) => {
   const id = c.req.param("id");
   const parsed = await parseJson(c, productInsertSchema.partial());
   if (!parsed.ok) return parsed.response;
@@ -96,7 +101,7 @@ adminProductsRouter.patch("/:id", async (c) => {
 });
 
 // POST /api/v1/admin/products/:id/archive  (soft delete, idempotente)
-adminProductsRouter.post("/:id/archive", async (c) => {
+adminProductsRouter.post("/:id/archive", uuidParam("id"), async (c) => {
   const id = c.req.param("id");
   const [archived] = await db
     .update(products)
@@ -110,7 +115,7 @@ adminProductsRouter.post("/:id/archive", async (c) => {
 // --- Precios (nested) ---
 
 // POST /api/v1/admin/products/:id/prices
-adminProductsRouter.post("/:id/prices", async (c) => {
+adminProductsRouter.post("/:id/prices", uuidParam("id"), async (c) => {
   const productId = c.req.param("id");
   const parsed = await parseJson(c, productPriceInsertSchema.omit({ productId: true }));
   if (!parsed.ok) return parsed.response;
@@ -131,7 +136,11 @@ adminProductsRouter.post("/:id/prices", async (c) => {
 });
 
 // PATCH /api/v1/admin/products/:id/prices/:priceId
-adminProductsRouter.patch("/:id/prices/:priceId", async (c) => {
+adminProductsRouter.patch(
+  "/:id/prices/:priceId",
+  uuidParam("id"),
+  uuidParam("priceId"),
+  async (c) => {
   const productId = c.req.param("id");
   const priceId = c.req.param("priceId");
   const parsed = await parseJson(
@@ -149,7 +158,11 @@ adminProductsRouter.patch("/:id/prices/:priceId", async (c) => {
 });
 
 // DELETE /api/v1/admin/products/:id/prices/:priceId
-adminProductsRouter.delete("/:id/prices/:priceId", async (c) => {
+adminProductsRouter.delete(
+  "/:id/prices/:priceId",
+  uuidParam("id"),
+  uuidParam("priceId"),
+  async (c) => {
   const productId = c.req.param("id");
   const priceId = c.req.param("priceId");
   const [deleted] = await db
@@ -163,7 +176,7 @@ adminProductsRouter.delete("/:id/prices/:priceId", async (c) => {
 // --- Imágenes (nested) ---
 
 // POST /api/v1/admin/products/:id/images
-adminProductsRouter.post("/:id/images", async (c) => {
+adminProductsRouter.post("/:id/images", uuidParam("id"), async (c) => {
   const productId = c.req.param("id");
   const parsed = await parseJson(c, productImageInsertSchema.omit({ productId: true }));
   if (!parsed.ok) return parsed.response;
@@ -174,8 +187,73 @@ adminProductsRouter.post("/:id/images", async (c) => {
   return c.json({ image: created }, 201);
 });
 
+// PATCH /api/v1/admin/products/:id/images/reorder
+// Reordena todas las imágenes del producto en una sola escritura atómica.
+// El body debe listar exactamente todas las imágenes del producto (mismo set);
+// cada una recibe como position su índice en el array (0..n-1).
+adminProductsRouter.patch(
+  "/:id/images/reorder",
+  uuidParam("id"),
+  async (c) => {
+    const productId = c.req.param("id");
+    const parsed = await parseJson(c, imageReorderSchema);
+    if (!parsed.ok) return parsed.response;
+    const { imageIds } = parsed.data;
+
+    try {
+      const images = await db.transaction(async (tx) => {
+        const existing = await tx
+          .select({ id: productImages.id })
+          .from(productImages)
+          .where(eq(productImages.productId, productId));
+
+        const existingIds = new Set(existing.map((img) => img.id));
+        const requested = new Set(imageIds);
+        // El set del body debe coincidir exactamente con las imágenes del producto:
+        // misma cantidad (descarta duplicados/faltantes) y todas pertenecen a él.
+        const sameSet =
+          requested.size === imageIds.length &&
+          existingIds.size === requested.size &&
+          imageIds.every((id) => existingIds.has(id));
+        if (!sameSet) {
+          throw new ReorderError();
+        }
+
+        // position no tiene constraint unique → setear 0..n-1 no colisiona.
+        for (const [index, imageId] of imageIds.entries()) {
+          await tx
+            .update(productImages)
+            .set({ position: index })
+            .where(
+              and(
+                eq(productImages.id, imageId),
+                eq(productImages.productId, productId),
+              ),
+            );
+        }
+
+        return tx
+          .select()
+          .from(productImages)
+          .where(eq(productImages.productId, productId))
+          .orderBy(productImages.position);
+      });
+      return c.json({ images });
+    } catch (e) {
+      if (e instanceof ReorderError) {
+        return fail(c, 400, "Las imágenes no coinciden con las del producto");
+      }
+      throw e;
+    }
+  },
+);
+
 // PATCH /api/v1/admin/products/:id/images/:imageId
-adminProductsRouter.patch("/:id/images/:imageId", async (c) => {
+adminProductsRouter.patch(
+  "/:id/images/:imageId",
+  uuidParam("id"),
+  uuidParam("imageId"),
+  async (c) => {
   const productId = c.req.param("id");
   const imageId = c.req.param("imageId");
   const parsed = await parseJson(
@@ -193,7 +271,11 @@ adminProductsRouter.patch("/:id/images/:imageId", async (c) => {
 });
 
 // DELETE /api/v1/admin/products/:id/images/:imageId
-adminProductsRouter.delete("/:id/images/:imageId", async (c) => {
+adminProductsRouter.delete(
+  "/:id/images/:imageId",
+  uuidParam("id"),
+  uuidParam("imageId"),
+  async (c) => {
   const productId = c.req.param("id");
   const imageId = c.req.param("imageId");
   const [deleted] = await db
@@ -207,7 +289,7 @@ adminProductsRouter.delete("/:id/images/:imageId", async (c) => {
 // --- Categorías del producto (link table) ---
 
 // POST /api/v1/admin/products/:id/categories
-adminProductsRouter.post("/:id/categories", async (c) => {
+adminProductsRouter.post("/:id/categories", uuidParam("id"), async (c) => {
   const productId = c.req.param("id");
   const parsed = await parseJson(c, linkCategorySchema);
   if (!parsed.ok) return parsed.response;
@@ -219,7 +301,11 @@ adminProductsRouter.post("/:id/categories", async (c) => {
 });
 
 // DELETE /api/v1/admin/products/:id/categories/:categoryId
-adminProductsRouter.delete("/:id/categories/:categoryId", async (c) => {
+adminProductsRouter.delete(
+  "/:id/categories/:categoryId",
+  uuidParam("id"),
+  uuidParam("categoryId"),
+  async (c) => {
   const productId = c.req.param("id");
   const categoryId = c.req.param("categoryId");
   const [deleted] = await db

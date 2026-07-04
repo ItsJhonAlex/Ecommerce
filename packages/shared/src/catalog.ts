@@ -41,6 +41,13 @@ export const linkCategorySchema = z.object({
 
 export type LinkCategoryInput = z.infer<typeof linkCategorySchema>;
 
+/** Body de PATCH /admin/products/:id/images/reorder (nuevo orden de imágenes). */
+export const imageReorderSchema = z.object({
+  imageIds: z.array(z.uuid()).min(1),
+});
+
+export type ImageReorderInput = z.infer<typeof imageReorderSchema>;
+
 /**
  * Query de GET /admin/products. status y q opcionales pero validados.
  * `q` vacío ("" — p. ej. al limpiar el buscador) se trata como ausente, no como error.

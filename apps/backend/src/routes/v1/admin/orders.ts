@@ -1,17 +1,14 @@
 import { db } from "@avanzar/db";
-import {
-  orderItems,
-  orderStatusHistory,
-  orders,
-  products,
-} from "@avanzar/db/schema";
+import { orderStatusHistory, orders } from "@avanzar/db/schema";
 import { orderListQuerySchema, updateOrderStatusSchema } from "@avanzar/shared";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
+import { uuidParam } from "../../../lib/uuid";
 import { parseJson, parseQuery } from "../../../lib/validate";
 import type { AuthEnv } from "../../../middlewares/auth";
 import { canTransition } from "../../../services/order-status";
+import { restockOrderItems } from "../../../services/orders/cancel";
 import { renderReceipt } from "../../../services/receipt/render";
 import { getStoreSettings } from "../../../services/store-settings";
 
@@ -32,7 +29,7 @@ adminOrdersRouter.get("/", async (c) => {
 });
 
 // GET /api/v1/admin/orders/:id
-adminOrdersRouter.get("/:id", async (c) => {
+adminOrdersRouter.get("/:id", uuidParam("id"), async (c) => {
   const id = c.req.param("id");
   const order = await db.query.orders.findFirst({
     where: (o, { eq: e }) => e(o.id, id),
@@ -47,7 +44,7 @@ adminOrdersRouter.get("/:id", async (c) => {
 });
 
 // GET /api/v1/admin/orders/:id/receipt — recibo del pedido en PDF.
-adminOrdersRouter.get("/:id/receipt", async (c) => {
+adminOrdersRouter.get("/:id/receipt", uuidParam("id"), async (c) => {
   const id = c.req.param("id");
   const order = await db.query.orders.findFirst({
     where: (o, { eq: e }) => e(o.id, id),
@@ -71,7 +68,7 @@ adminOrdersRouter.get("/:id/receipt", async (c) => {
 });
 
 // PATCH /api/v1/admin/orders/:id/status
-adminOrdersRouter.patch("/:id/status", async (c) => {
+adminOrdersRouter.patch("/:id/status", uuidParam("id"), async (c) => {
   const id = c.req.param("id");
   const changedBy = c.var.user.id;
   const parsed = await parseJson(c, updateOrderStatusSchema);
@@ -109,24 +106,9 @@ adminOrdersRouter.patch("/:id/status", async (c) => {
       changedBy,
     });
 
-    // Cancelar repone el stock descontado en el checkout. Solo para items cuyo
-    // producto sigue existiendo (productId es set-null si el producto se borró).
+    // Cancelar repone el stock descontado en el checkout.
     if (status === "cancelled") {
-      const items = await tx
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, id));
-      for (const it of items) {
-        if (it.productId) {
-          await tx
-            .update(products)
-            .set({
-              stockQuantity: sql`${products.stockQuantity} + ${it.quantity}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(products.id, it.productId));
-        }
-      }
+      await restockOrderItems(tx, id);
     }
 
     return row;

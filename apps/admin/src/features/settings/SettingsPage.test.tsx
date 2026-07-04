@@ -1,6 +1,8 @@
-import { screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, test } from "vitest";
 import { server } from "@/test/setup";
 import { renderWithProviders } from "@/test/utils";
@@ -103,6 +105,55 @@ describe("SettingsPage", () => {
         notifySmsEnabled: true,
       }),
     );
+  });
+
+  test("una edición sin guardar sobrevive a un refetch de settings", async () => {
+    // Enfoque: montar providers inline para tener acceso al QueryClient y
+    // disparar un refetch real (invalidateQueries), que es lo que ocurriría con
+    // refetchOnWindowFocus. El segundo GET devuelve un businessName distinto: si
+    // el viejo effect re-sembrara en cada `data`, pisaría la edición del usuario.
+    let getCount = 0;
+    server.use(
+      http.get("/api/v1/admin/settings", () => {
+        getCount += 1;
+        return HttpResponse.json({
+          settings:
+            getCount === 1
+              ? settings
+              : { ...settings, businessName: "Valor del server" },
+        });
+      }),
+    );
+
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const router = createMemoryRouter(
+      [{ path: "/settings", element: <SettingsPage /> }],
+      { initialEntries: ["/settings"] },
+    );
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    const name = await screen.findByLabelText("Nombre del negocio");
+    expect(name).toHaveValue("Avanzar");
+
+    await userEvent.clear(name);
+    await userEvent.type(name, "Editado sin guardar");
+    expect(name).toHaveValue("Editado sin guardar");
+
+    // Forzar el refetch que dispararía el re-seed viejo.
+    await client.invalidateQueries({ queryKey: ["settings"] });
+    await waitFor(() => expect(getCount).toBeGreaterThanOrEqual(2));
+
+    // La edición del usuario se conserva: el refetch no la pisó.
+    expect(name).toHaveValue("Editado sin guardar");
   });
 
   test("no agrega un número con formato inválido", async () => {

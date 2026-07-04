@@ -4,8 +4,12 @@ import { logger } from "hono/logger";
 import { auth } from "./auth";
 import { loadEnv } from "./env";
 import { v1 } from "./routes/v1";
+import { cancelStaleUnpaidOrders } from "./services/orders/expire-stale";
 
 const env = loadEnv();
+
+/** Cada cuánto corre el barrido de órdenes impagas vencidas (1 hora). */
+const STALE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
 export const app = new Hono();
 
@@ -43,6 +47,17 @@ app.onError((err, c) => {
   console.error("Error no controlado:", err);
   return c.json({ error: "Error interno del servidor" }, 500);
 });
+
+// Barrido periódico de órdenes impagas vencidas: solo cuando este archivo es el
+// entrypoint del server (`bun run src/index.ts`). Al importar `app` en los tests
+// `import.meta.main` es false, así que el interval NO arranca en la suite.
+if (import.meta.main) {
+  setInterval(() => {
+    void cancelStaleUnpaidOrders().catch((e) =>
+      console.error("[expire-stale]", e),
+    );
+  }, STALE_SWEEP_INTERVAL_MS);
+}
 
 export default {
   port: env.PORT,

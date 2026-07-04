@@ -137,6 +137,28 @@ describe("PATCH /api/v1/admin/orders/:id/status", () => {
   });
 });
 
+describe("uuidParam — params con formato inválido dan 404 (no 500)", () => {
+  test("admin GET /:id no-uuid → 404", async () => {
+    const cookie = await adminCookie();
+    const res = await request("/api/v1/admin/orders/no-es-uuid", {
+      headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test("público GET /orders/:id no-uuid (con sesión) → 404", async () => {
+    const { cookie } = await signUp({
+      name: "Cliente",
+      email: "cliente@avanzar.test",
+      password: "supersecret123",
+    });
+    const res = await request("/api/v1/orders/no-es-uuid", {
+      headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("PATCH estado — camino de retiro", () => {
   test("retiro: preparing → ready_for_pickup → delivered", async () => {
     const cookie = await adminCookie();

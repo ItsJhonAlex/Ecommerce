@@ -14,6 +14,7 @@ import { auth } from "../../../auth";
 import { isUniqueViolation } from "../../../lib/db-errors";
 import { fail } from "../../../lib/responses";
 import { parseJson } from "../../../lib/validate";
+import { rateLimit } from "../../../middlewares/rate-limit";
 import {
   CheckoutError,
   computeOrderTotals,
@@ -25,11 +26,18 @@ import { notifyNewOrder } from "../../../services/notify/new-order";
 /** Cuántas veces se reintenta el checkout ante colisión del order_number. */
 const MAX_ORDER_NUMBER_ATTEMPTS = 5;
 
+/** Ventana y tope del rate limit del checkout: 20 requests por minuto por IP. */
+const CHECKOUT_RATE_WINDOW_MS = 60_000;
+const CHECKOUT_RATE_MAX = 20;
+
 /** Checkout: descuenta stock, crea orden + items + historial + pago pending en una transacción. */
 export const checkoutRouter = new Hono();
 
 // POST /api/v1/checkout
-checkoutRouter.post("/", async (c) => {
+checkoutRouter.post(
+  "/",
+  rateLimit({ windowMs: CHECKOUT_RATE_WINDOW_MS, max: CHECKOUT_RATE_MAX }),
+  async (c) => {
   const parsed = await parseJson(c, checkoutSchema);
   if (!parsed.ok) return parsed.response;
   const input = parsed.data;
@@ -195,7 +203,8 @@ checkoutRouter.post("/", async (c) => {
   }
 
   // Inalcanzable (el loop retorna o lanza), pero TS necesita un return final.
-  return fail(c, 503, "No se pudo generar el número de orden, reintentá", {
-    code: "ORDER_NUMBER_COLLISION",
-  });
-});
+    return fail(c, 503, "No se pudo generar el número de orden, reintentá", {
+      code: "ORDER_NUMBER_COLLISION",
+    });
+  },
+);

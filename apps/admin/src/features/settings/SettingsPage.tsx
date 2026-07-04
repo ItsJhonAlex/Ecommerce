@@ -1,5 +1,5 @@
 import { Trash2 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { ErrorState, LoadingState } from "@/components/states";
@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
 import { useSettings, useUpdateSettings } from "./hooks";
 import { ReceiptPreview } from "./ReceiptPreview";
+import type { StoreSettings } from "./types";
 
 // Estado del form: strings planas (los null del server se muestran como "").
 type FormState = {
@@ -36,6 +37,19 @@ const EMPTY_FORM: FormState = {
 // Formato de número cubano para SMS: +53 seguido de 8 dígitos.
 const PHONE_RE = /^\+53\d{8}$/;
 
+// Mapea los ajustes del server al estado del form (los null se muestran como "").
+function toFormState(s: StoreSettings): FormState {
+  return {
+    businessName: s.businessName ?? "",
+    phone: s.phone ?? "",
+    address: s.address ?? "",
+    email: s.email ?? "",
+    receiptNote: s.receiptNote ?? "",
+    notifyPhones: s.notifyPhones ?? [],
+    notifySmsEnabled: s.notifySmsEnabled ?? false,
+  };
+}
+
 /** Página "Negocio": datos que aparecen en el recibo. */
 export function SettingsPage() {
   const { data, isPending, isError, error, refetch } = useSettings();
@@ -44,19 +58,16 @@ export function SettingsPage() {
   // Estado local del editor de números: input + error inline de validación.
   const [phoneInput, setPhoneInput] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  // El form se siembra una sola vez: los refetches (p. ej. refetchOnWindowFocus)
+  // no deben pisar ediciones sin guardar. Se re-siembra sólo tras un guardado ok.
+  const seeded = useRef(false);
 
-  // Inicializar el form desde los ajustes cargados (null → "").
+  // Sembrar el form desde los ajustes cargados, pero sólo la primera vez que
+  // llega `data`. En refetches posteriores no se toca el estado del usuario.
   useEffect(() => {
-    if (data) {
-      setForm({
-        businessName: data.businessName ?? "",
-        phone: data.phone ?? "",
-        address: data.address ?? "",
-        email: data.email ?? "",
-        receiptNote: data.receiptNote ?? "",
-        notifyPhones: data.notifyPhones ?? [],
-        notifySmsEnabled: data.notifySmsEnabled ?? false,
-      });
+    if (data && !seeded.current) {
+      seeded.current = true;
+      setForm(toFormState(data));
     }
   }, [data]);
 
@@ -90,7 +101,12 @@ export function SettingsPage() {
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     update.mutate(form, {
-      onSuccess: () => toast.success("Ajustes guardados"),
+      onSuccess: (res) => {
+        // Re-sincronizar el baseline con lo efectivamente guardado (respuesta
+        // del PATCH), para que un refetch posterior no reintroduzca valores viejos.
+        setForm(toFormState(res.settings));
+        toast.success("Ajustes guardados");
+      },
       onError: (err: unknown) =>
         toast.error(
           err instanceof ApiError ? err.message : "No se pudieron guardar",

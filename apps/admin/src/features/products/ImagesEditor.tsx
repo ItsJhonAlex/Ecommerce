@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
-import { useAddImage, useDeleteImage, useUpdateImage } from "./hooks";
+import { useAddImage, useDeleteImage, useReorderImages } from "./hooks";
 import type { ProductImage } from "./types";
 
 /** Editor de imágenes (por URL) de un producto, con reordenamiento ↑/↓. */
@@ -18,7 +18,7 @@ export function ImagesEditor({
 }) {
   const add = useAddImage(productId);
   const del = useDeleteImage(productId);
-  const update = useUpdateImage(productId);
+  const reorder = useReorderImages(productId);
   const [url, setUrl] = useState("");
   const [alt, setAlt] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,11 +42,17 @@ export function ImagesEditor({
   }
 
   function swap(index: number, dir: -1 | 1) {
+    const target = index + dir;
     const a = sorted[index];
-    const b = sorted[index + dir];
+    const b = sorted[target];
     if (!a || !b) return;
-    update.mutate({ imageId: a.id, position: b.position });
-    update.mutate({ imageId: b.id, position: a.position });
+    // Intercambio con el vecino → nuevo orden de ids, una sola escritura atómica.
+    const newIds = sorted.map((img) => img.id);
+    newIds[index] = b.id;
+    newIds[target] = a.id;
+    reorder.mutate(newIds, {
+      onError: () => toast.error("No se pudo reordenar"),
+    });
   }
 
   return (
@@ -70,7 +76,7 @@ export function ImagesEditor({
                 variant="ghost"
                 size="icon"
                 aria-label="Subir imagen"
-                disabled={i === 0}
+                disabled={i === 0 || reorder.isPending}
                 onClick={() => swap(i, -1)}
               >
                 <ChevronUp className="size-4" />
@@ -79,7 +85,7 @@ export function ImagesEditor({
                 variant="ghost"
                 size="icon"
                 aria-label="Bajar imagen"
-                disabled={i === sorted.length - 1}
+                disabled={i === sorted.length - 1 || reorder.isPending}
                 onClick={() => swap(i, 1)}
               >
                 <ChevronDown className="size-4" />

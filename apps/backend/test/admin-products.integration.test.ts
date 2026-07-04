@@ -25,6 +25,76 @@ async function createProduct(cookie: string, slug: string): Promise<string> {
   return ((await res.json()) as { product: { id: string } }).product.id;
 }
 
+async function addImage(
+  cookie: string,
+  productId: string,
+  url: string,
+  position: number,
+): Promise<string> {
+  const res = await request(`/api/v1/admin/products/${productId}/images`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ url, position }),
+  });
+  expect(res.status).toBe(201);
+  return ((await res.json()) as { image: { id: string } }).image.id;
+}
+
+describe("productos: reorden atómico de imágenes", () => {
+  test("PATCH images/reorder invierte las posiciones → GET refleja 0..n-1", async () => {
+    const cookie = await adminCookie();
+    const id = await createProduct(cookie, "remera-imgs");
+    const i0 = await addImage(cookie, id, "https://x.com/0.jpg", 0);
+    const i1 = await addImage(cookie, id, "https://x.com/1.jpg", 1);
+    const i2 = await addImage(cookie, id, "https://x.com/2.jpg", 2);
+
+    const reversed = [i2, i1, i0];
+    const res = await request(`/api/v1/admin/products/${id}/images/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ imageIds: reversed }),
+    });
+    expect(res.status).toBe(200);
+
+    const get = await request(`/api/v1/admin/products/${id}`, {
+      method: "GET",
+      headers: { Cookie: cookie },
+    });
+    expect(get.status).toBe(200);
+    const { product } = (await get.json()) as {
+      product: { images: { id: string; position: number }[] };
+    };
+    const byId = new Map(product.images.map((img) => [img.id, img.position]));
+    expect(byId.get(i2)).toBe(0);
+    expect(byId.get(i1)).toBe(1);
+    expect(byId.get(i0)).toBe(2);
+  });
+
+  test("imageIds con un id ajeno/faltante → 400", async () => {
+    const cookie = await adminCookie();
+    const id = await createProduct(cookie, "remera-imgs-2");
+    const i0 = await addImage(cookie, id, "https://x.com/0.jpg", 0);
+    const i1 = await addImage(cookie, id, "https://x.com/1.jpg", 1);
+
+    // Un id ajeno (no pertenece al producto) reemplaza a uno propio: set no coincide.
+    const foreign = "00000000-0000-4000-8000-000000000000";
+    const res = await request(`/api/v1/admin/products/${id}/images/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ imageIds: [i0, foreign] }),
+    });
+    expect(res.status).toBe(400);
+
+    // Faltante: sólo se manda una de las dos imágenes → set no coincide.
+    const res2 = await request(`/api/v1/admin/products/${id}/images/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ imageIds: [i1] }),
+    });
+    expect(res2.status).toBe(400);
+  });
+});
+
 describe("productos: colisiones → 409", () => {
   test("slug duplicado → 409 PRODUCT_SLUG_TAKEN", async () => {
     const cookie = await adminCookie();

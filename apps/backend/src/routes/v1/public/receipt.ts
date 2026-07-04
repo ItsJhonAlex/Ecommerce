@@ -1,13 +1,9 @@
 import { db } from "@avanzar/db";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
+import { UUID_RE } from "../../../lib/uuid";
 import { renderReceipt } from "../../../services/receipt/render";
 import { getStoreSettings } from "../../../services/store-settings";
-
-/** UUID: valida el formato antes de tocar la DB (la columna es uuid y un string
- * arbitrario haría fallar el query). Ante formato inválido, 404 igual que si no
- * matcheara, sin revelar si existe o no. */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Acceso público al recibo por token opaco (sin auth). */
 export const receiptRouter = new Hono();

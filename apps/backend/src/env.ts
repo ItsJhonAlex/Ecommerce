@@ -21,6 +21,9 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   NOX_SMS_BASE_URL: optionalEnv(z.string().url()),
   NOX_SMS_TOKEN_SECRET: optionalEnv(z.string().min(1)),
+  // Horas tras las cuales una orden impaga se auto-cancela. Opcional; el barrido
+  // usa 72 por defecto cuando no está configurada.
+  ORDER_UNPAID_TTL_HOURS: optionalEnv(z.coerce.number().int().positive()),
 });
 
 export type Env = z.infer<typeof envSchema>;

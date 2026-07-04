@@ -4,6 +4,7 @@ import { addressInsertSchema } from "@avanzar/shared";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
+import { uuidParam } from "../../../lib/uuid";
 import { parseJson } from "../../../lib/validate";
 import { type AuthEnv, requireSession } from "../../../middlewares/auth";
 
@@ -23,7 +24,7 @@ addressesRouter.get("/", async (c) => {
 });
 
 // GET /api/v1/addresses/:id
-addressesRouter.get("/:id", async (c) => {
+addressesRouter.get("/:id", uuidParam("id"), async (c) => {
   const userId = c.var.user.id;
   const id = c.req.param("id");
   const [item] = await db
@@ -49,7 +50,7 @@ addressesRouter.post("/", async (c) => {
 });
 
 // PATCH /api/v1/addresses/:id
-addressesRouter.patch("/:id", async (c) => {
+addressesRouter.patch("/:id", uuidParam("id"), async (c) => {
   const userId = c.var.user.id;
   const id = c.req.param("id");
   const parsed = await parseJson(c, addressInsertSchema.partial());
@@ -65,7 +66,7 @@ addressesRouter.patch("/:id", async (c) => {
 });
 
 // DELETE /api/v1/addresses/:id
-addressesRouter.delete("/:id", async (c) => {
+addressesRouter.delete("/:id", uuidParam("id"), async (c) => {
   const userId = c.var.user.id;
   const id = c.req.param("id");
   const [deleted] = await db

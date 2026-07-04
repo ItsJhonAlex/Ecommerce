@@ -1,6 +1,7 @@
 import { db } from "@avanzar/db";
 import { Hono } from "hono";
 import { fail } from "../../../lib/responses";
+import { uuidParam } from "../../../lib/uuid";
 import { type AuthEnv, requireSession } from "../../../middlewares/auth";
 
 /** Pedidos del usuario autenticado (solo lectura; se crean vía checkout). */
@@ -20,7 +21,7 @@ ordersRouter.get("/", async (c) => {
 });
 
 // GET /api/v1/orders/:id
-ordersRouter.get("/:id", async (c) => {
+ordersRouter.get("/:id", uuidParam("id"), async (c) => {
   const userId = c.var.user.id;
   const id = c.req.param("id");
   const order = await db.query.orders.findFirst({

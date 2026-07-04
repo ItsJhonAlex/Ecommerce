@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
 import { useSettings, useUpdateSettings } from "./hooks";
+import { ReceiptPreview } from "./ReceiptPreview";
 
 // Estado del form: strings planas (los null del server se muestran como "").
 type FormState = {
@@ -106,6 +107,7 @@ export function SettingsPage() {
       ) : isError ? (
         <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
       ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardContent>
             <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
@@ -223,6 +225,18 @@ export function SettingsPage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Vista previa del recibo con los valores del form (sin guardar). */}
+        <ReceiptPreview
+          values={{
+            businessName: form.businessName,
+            phone: form.phone,
+            address: form.address,
+            email: form.email,
+            receiptNote: form.receiptNote,
+          }}
+        />
+        </div>
       )}
     </div>
   );

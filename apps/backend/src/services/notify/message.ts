@@ -16,6 +16,7 @@ const SMS_MAX_LENGTH = 160;
 export function buildNewOrderMessage(order: NewOrderInfo, businessName: string): string {
   const amount = (order.totalMinor / 100).toFixed(2);
   const fulfillment = order.fulfillment === "pickup" ? "Retiro" : "Domicilio";
-  const message = `${businessName}: nueva orden ${order.orderNumber} · ${amount} ${order.currency} · ${fulfillment}`;
+  // Separador " - " (GSM-7): evita forzar codificación UCS-2 como haría "·".
+  const message = `${businessName}: nueva orden ${order.orderNumber} - ${amount} ${order.currency} - ${fulfillment}`;
   return message.slice(0, SMS_MAX_LENGTH);
 }

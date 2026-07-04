@@ -53,14 +53,20 @@ export async function notifyNewOrder(
     const baseUrl = env.NOX_SMS_BASE_URL ?? DEFAULT_SMS_BASE_URL;
 
     for (const phone of settings.notifyPhones) {
-      const result = await deps.sendSms(baseUrl, env.NOX_SMS_TOKEN_SECRET, phone, message);
-      if (result.ok) {
-        console.info(`[notify] SMS enviado a ${phone} (orden ${order.orderNumber})`);
-      } else {
-        console.warn(
-          `[notify] Falló SMS a ${phone} (orden ${order.orderNumber}):`,
-          result.status ?? result.error,
-        );
+      // try/catch por número: un fallo (aunque sendSms llegara a lanzar) no frena
+      // el envío a los demás destinatarios.
+      try {
+        const result = await deps.sendSms(baseUrl, env.NOX_SMS_TOKEN_SECRET, phone, message);
+        if (result.ok) {
+          console.info(`[notify] SMS enviado a ${phone} (orden ${order.orderNumber})`);
+        } else {
+          console.warn(
+            `[notify] Falló SMS a ${phone} (orden ${order.orderNumber}):`,
+            result.status ?? result.error,
+          );
+        }
+      } catch (e) {
+        console.warn(`[notify] Error enviando SMS a ${phone} (orden ${order.orderNumber}):`, e);
       }
     }
   } catch (e) {

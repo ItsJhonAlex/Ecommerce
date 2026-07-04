@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 /**
+ * Variable opcional donde un string vacío en `.env` (ej. `NOX_SMS_TOKEN_SECRET=`)
+ * equivale a "no configurada": se normaliza a `undefined` antes de validar. Así
+ * dejar la clave vacía = feature desactivado, sin romper el arranque.
+ */
+const optionalEnv = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => (v === "" ? undefined : v), schema.optional());
+
+/**
  * Schema del entorno. Se exporta aparte para poder testearlo sin disparar la
  * validación con side-effects (process.exit) de loadEnv().
  */
@@ -11,8 +19,8 @@ export const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(1),
   BETTER_AUTH_URL: z.url(),
   PORT: z.coerce.number().int().positive().default(3000),
-  NOX_SMS_BASE_URL: z.string().url().optional(),
-  NOX_SMS_TOKEN_SECRET: z.string().min(1).optional(),
+  NOX_SMS_BASE_URL: optionalEnv(z.string().url()),
+  NOX_SMS_TOKEN_SECRET: optionalEnv(z.string().min(1)),
 });
 
 export type Env = z.infer<typeof envSchema>;

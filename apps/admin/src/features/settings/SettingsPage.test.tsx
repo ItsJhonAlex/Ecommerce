@@ -13,6 +13,8 @@ const settings = {
   address: null,
   email: null,
   receiptNote: null,
+  notifyPhones: ["+5351234567"],
+  notifySmsEnabled: false,
   updatedAt: null,
 };
 
@@ -55,5 +57,70 @@ describe("SettingsPage", () => {
     await waitFor(() =>
       expect(received).toMatchObject({ businessName: "Avanzar SRL", phone: "555" }),
     );
+  });
+
+  test("renderiza los números de notificación existentes", async () => {
+    server.use(
+      http.get("/api/v1/admin/settings", () =>
+        HttpResponse.json({ settings }),
+      ),
+    );
+    renderWithProviders(<SettingsPage />, { path: "/settings" });
+    expect(await screen.findByText("+5351234567")).toBeInTheDocument();
+  });
+
+  test("agregar número + activar SMS incluye ambos en el PATCH", async () => {
+    let received: { notifyPhones?: string[]; notifySmsEnabled?: boolean } | null =
+      null;
+    server.use(
+      http.get("/api/v1/admin/settings", () =>
+        HttpResponse.json({ settings }),
+      ),
+      http.patch("/api/v1/admin/settings", async ({ request }) => {
+        received = (await request.json()) as typeof received;
+        return HttpResponse.json({ settings });
+      }),
+    );
+    renderWithProviders(<SettingsPage />, { path: "/settings" });
+
+    // Esperar a que carguen los ajustes (número existente visible).
+    await screen.findByText("+5351234567");
+
+    const phoneInput = screen.getByLabelText("Agregar número");
+    await userEvent.type(phoneInput, "+5359876543");
+    await userEvent.click(screen.getByRole("button", { name: "Agregar" }));
+
+    const checkbox = screen.getByLabelText(
+      "Avisar por SMS cuando entra un pedido",
+    );
+    await userEvent.click(checkbox);
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(received).toMatchObject({
+        notifyPhones: ["+5351234567", "+5359876543"],
+        notifySmsEnabled: true,
+      }),
+    );
+  });
+
+  test("no agrega un número con formato inválido", async () => {
+    server.use(
+      http.get("/api/v1/admin/settings", () =>
+        HttpResponse.json({ settings }),
+      ),
+    );
+    renderWithProviders(<SettingsPage />, { path: "/settings" });
+
+    await screen.findByText("+5351234567");
+
+    const phoneInput = screen.getByLabelText("Agregar número");
+    await userEvent.type(phoneInput, "123");
+    await userEvent.click(screen.getByRole("button", { name: "Agregar" }));
+
+    // El número inválido no se muestra y aparece el error inline.
+    expect(screen.queryByText("123")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 });

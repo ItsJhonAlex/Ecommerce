@@ -11,6 +11,8 @@ export const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(1),
   BETTER_AUTH_URL: z.url(),
   PORT: z.coerce.number().int().positive().default(3000),
+  NOX_SMS_BASE_URL: z.string().url().optional(),
+  NOX_SMS_TOKEN_SECRET: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -35,6 +35,10 @@ export const storeSettingsUpdateSchema = z.object({
     })
     .transform((v) => (v === "" ? null : v))
     .optional(),
+  notifyPhones: z
+    .array(z.string().regex(/^\+53\d{8}$/, "Número cubano inválido"))
+    .optional(),
+  notifySmsEnabled: z.boolean().optional(),
 });
 
 export type StoreSettings = z.infer<typeof storeSettingsSelectSchema>;

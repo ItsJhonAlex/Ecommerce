@@ -7,6 +7,8 @@ const DEFAULTS = {
   address: null,
   email: null,
   receiptNote: null,
+  notifyPhones: [] as string[],
+  notifySmsEnabled: false,
 } as const;
 
 /**

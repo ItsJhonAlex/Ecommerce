@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * Ajustes del negocio (tabla singleton). Siempre una única fila con `id = 'default'`.
@@ -13,5 +13,7 @@ export const storeSettings = pgTable("store_settings", {
   address: text("address"),
   email: text("email"),
   receiptNote: text("receipt_note"),
+  notifyPhones: text("notify_phones").array().notNull().default([]),
+  notifySmsEnabled: boolean("notify_sms_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

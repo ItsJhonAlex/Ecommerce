@@ -1,0 +1,2 @@
+ALTER TABLE "store_settings" ADD COLUMN "notify_phones" text[] DEFAULT '{}' NOT NULL;--> statement-breakpoint
+ALTER TABLE "store_settings" ADD COLUMN "notify_sms_enabled" boolean DEFAULT false NOT NULL;

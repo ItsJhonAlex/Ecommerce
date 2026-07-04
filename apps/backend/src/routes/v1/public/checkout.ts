@@ -20,6 +20,7 @@ import {
   generateOrderNumber,
   resolveCheckoutItems,
 } from "../../../services/checkout";
+import { notifyNewOrder } from "../../../services/notify/new-order";
 
 /** Cuántas veces se reintenta el checkout ante colisión del order_number. */
 const MAX_ORDER_NUMBER_ATTEMPTS = 5;
@@ -175,6 +176,8 @@ checkoutRouter.post("/", async (c) => {
         return { order, payment };
       });
 
+      // Aviso de orden nueva por SMS (fire-and-forget: no bloquea ni rompe el checkout).
+      void notifyNewOrder(result.order).catch(() => {});
       return c.json(result, 201);
     } catch (e) {
       if (e instanceof CheckoutError) {

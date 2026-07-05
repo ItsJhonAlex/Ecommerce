@@ -24,6 +24,10 @@ export const envSchema = z.object({
   // Horas tras las cuales una orden impaga se auto-cancela. Opcional; el barrido
   // usa 72 por defecto cuando no está configurada.
   ORDER_UNPAID_TTL_HOURS: optionalEnv(z.coerce.number().int().positive()),
+  // "true" SOLO si el backend corre detrás de un reverse-proxy que setea
+  // x-real-ip/x-forwarded-for de forma confiable (el proxy debe sobrescribirlos).
+  // Define de dónde el rate limiter toma la IP del cliente. Default: false (IP del socket).
+  TRUST_PROXY: optionalEnv(z.enum(["true", "false"])),
 });
 
 export type Env = z.infer<typeof envSchema>;

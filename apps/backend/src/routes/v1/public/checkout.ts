@@ -11,6 +11,7 @@ import { checkoutSchema } from "@avanzar/shared";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { auth } from "../../../auth";
+import { loadEnv } from "../../../env";
 import { isUniqueViolation } from "../../../lib/db-errors";
 import { fail } from "../../../lib/responses";
 import { parseJson } from "../../../lib/validate";
@@ -29,6 +30,8 @@ const MAX_ORDER_NUMBER_ATTEMPTS = 5;
 /** Ventana y tope del rate limit del checkout: 20 requests por minuto por IP. */
 const CHECKOUT_RATE_WINDOW_MS = 60_000;
 const CHECKOUT_RATE_MAX = 20;
+/** Confiar en los headers de proxy para la IP solo si el entorno lo declara. */
+const TRUST_PROXY = loadEnv().TRUST_PROXY === "true";
 
 /** Checkout: descuenta stock, crea orden + items + historial + pago pending en una transacción. */
 export const checkoutRouter = new Hono();
@@ -36,7 +39,11 @@ export const checkoutRouter = new Hono();
 // POST /api/v1/checkout
 checkoutRouter.post(
   "/",
-  rateLimit({ windowMs: CHECKOUT_RATE_WINDOW_MS, max: CHECKOUT_RATE_MAX }),
+  rateLimit({
+    windowMs: CHECKOUT_RATE_WINDOW_MS,
+    max: CHECKOUT_RATE_MAX,
+    trustProxy: TRUST_PROXY,
+  }),
   async (c) => {
   const parsed = await parseJson(c, checkoutSchema);
   if (!parsed.ok) return parsed.response;

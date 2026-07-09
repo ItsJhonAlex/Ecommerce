@@ -1,0 +1,169 @@
+---
+import Base from "../../layouts/Base.astro";
+import Gallery from "../../components/Gallery.tsx";
+import AddToCart from "../../components/AddToCart.tsx";
+import { ApiError, apiGet } from "../../lib/api";
+import { getCurrencyFromCookieHeader } from "../../lib/currency";
+import { money } from "../../lib/money";
+
+/**
+ * Forma del detalle público (`GET /api/v1/products/:slug` → `{ product }`).
+ * Se declara local porque el storefront no importa `@avanzar/db`; espeja el
+ * contrato del backend (trae TODOS los precios; el front elige el de la moneda).
+ */
+type ProductDetail = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  stockQuantity: number;
+  prices: { currency: string; amountMinor: number }[];
+  images: { url: string; alt: string | null; position: number }[];
+  categories: { category: { name: string; slug: string } }[];
+};
+
+const { slug } = Astro.params;
+const currency = getCurrencyFromCookieHeader(
+  Astro.request.headers.get("cookie"),
+);
+
+let product: ProductDetail | null = null;
+let notFound = false;
+let loadError = false;
+
+try {
+  const data = await apiGet<{ product: ProductDetail }>(
+    `/api/v1/products/${slug}`,
+  );
+  product = data.product;
+} catch (err) {
+  // 404 → estado "no encontrado" con status 404; cualquier otro error → estado
+  // suave (no rompemos el layout, degradamos con status 502).
+  if (err instanceof ApiError && err.status === 404) {
+    notFound = true;
+  } else {
+    loadError = true;
+  }
+}
+
+// Orden importa: un outage (loadError) NO debe etiquetarse 404 (crawlers/caches
+// deindexarían URLs válidas). Evaluamos el error de carga primero.
+if (loadError) {
+  Astro.response.status = 502;
+} else if (notFound || !product) {
+  Astro.response.status = 404;
+}
+
+// Precio en la moneda activa (el detalle devuelve todos; elegimos el vigente).
+const price = product?.prices.find((p) => p.currency === currency);
+const soldOut = product ? product.stockQuantity === 0 : false;
+const images = product?.images.map((img) => ({ url: img.url, alt: img.alt })) ?? [];
+const title = product ? `${product.name} · Avanzar` : "Producto · Avanzar";
+---
+
+<Base title={title} description={product?.description ?? undefined}>
+  {
+    product ? (
+      <section class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+        <div class="grid gap-8 lg:grid-cols-2 lg:gap-12">
+          <div>
+            <Gallery images={images} name={product.name} client:load />
+          </div>
+
+          <div class="flex flex-col gap-6">
+            <div>
+              <h1 class="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+                {product.name}
+              </h1>
+
+              <p class="mt-3 text-2xl font-extrabold text-ink">
+                {
+                  price ? (
+                    money(price.amountMinor, currency)
+                  ) : (
+                    <span class="text-lg font-semibold text-muted">
+                      No disponible en {currency}
+                    </span>
+                  )
+                }
+              </p>
+            </div>
+
+            <p>
+              {
+                soldOut ? (
+                  <span class="inline-flex items-center rounded-full bg-ink/85 px-3 py-1 text-sm font-semibold text-paper">
+                    Agotado
+                  </span>
+                ) : (
+                  <span class="inline-flex items-center rounded-full bg-jade-100 px-3 py-1 text-sm font-semibold text-jade-600">
+                    Disponible · {product.stockQuantity} en stock
+                  </span>
+                )
+              }
+            </p>
+
+            {
+              product.description && (
+                <div class="prose-sm max-w-none whitespace-pre-line text-ink-soft">
+                  {product.description}
+                </div>
+              )
+            }
+
+            {
+              product.categories.length > 0 && (
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-sm font-medium text-muted">Categorías:</span>
+                  {product.categories.map(({ category }) => (
+                    <a
+                      href={`/categoria/${category.slug}`}
+                      class="inline-flex items-center rounded-full border border-line bg-surface px-3 py-1 text-sm font-medium text-ink-soft hover:border-brand-300 hover:text-brand-700"
+                    >
+                      {category.name}
+                    </a>
+                  ))}
+                </div>
+              )
+            }
+
+            <div class="border-t border-line pt-6">
+              <AddToCart slug={product.slug} disabled={soldOut} client:load />
+            </div>
+          </div>
+        </div>
+      </section>
+    ) : loadError ? (
+      <section class="mx-auto flex max-w-2xl flex-col items-center px-4 py-24 text-center sm:px-6">
+        <h1 class="text-2xl font-bold text-ink sm:text-3xl">
+          No pudimos cargar el producto
+        </h1>
+        <p class="mt-3 text-muted">
+          Hubo un problema al conectar con la tienda. Probá de nuevo en un rato.
+        </p>
+        <a
+          href="/productos"
+          class="mt-8 inline-flex items-center rounded-full bg-brand-500 px-6 py-3 font-semibold text-white shadow-sm hover:bg-brand-600"
+        >
+          Ver el catálogo
+        </a>
+      </section>
+    ) : (
+      <section class="mx-auto flex max-w-2xl flex-col items-center px-4 py-24 text-center sm:px-6">
+        <p class="text-6xl font-extrabold tracking-tight text-brand-500">404</p>
+        <h1 class="mt-4 text-2xl font-bold text-ink sm:text-3xl">
+          Producto no encontrado
+        </h1>
+        <p class="mt-3 text-muted">
+          Este producto no existe o ya no está disponible.
+        </p>
+        <a
+          href="/productos"
+          class="mt-8 inline-flex items-center rounded-full bg-brand-500 px-6 py-3 font-semibold text-white shadow-sm hover:bg-brand-600"
+        >
+          Ver el catálogo
+        </a>
+      </section>
+    )
+  }
+</Base>

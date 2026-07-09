@@ -1,0 +1,122 @@
+---
+import Base from "../layouts/Base.astro";
+import CatalogControls from "../components/CatalogControls.astro";
+import ProductGrid from "../components/ProductGrid.astro";
+import Pagination from "../components/Pagination.astro";
+import { apiGet, type ProductListResponse } from "../lib/api";
+import { getCurrencyFromCookieHeader } from "../lib/currency";
+import { emptyToUndef, unitsToMinor } from "../lib/catalog";
+
+// --- Lectura de la query (todo opcional) ------------------------------------
+const sp = Astro.url.searchParams;
+
+const q = emptyToUndef(sp.get("q"));
+const category = emptyToUndef(sp.get("category"));
+const sort = emptyToUndef(sp.get("sort"));
+const page = emptyToUndef(sp.get("page"));
+// minPrice/maxPrice viajan en la URL en UNIDADES enteras (lo que tipea el
+// usuario, ej. "10" = 10 USD). Guardamos ese valor tal cual para re-emitirlo en
+// los inputs y en los links de paginación.
+const minPriceUnits = emptyToUndef(sp.get("minPrice"));
+const maxPriceUnits = emptyToUndef(sp.get("maxPrice"));
+
+const currency = getCurrencyFromCookieHeader(
+  Astro.request.headers.get("cookie"),
+);
+
+// --- Fetch al catálogo (degradación suave ante error) -----------------------
+let data: ProductListResponse | null = null;
+let hadError = false;
+try {
+  data = await apiGet<ProductListResponse>("/api/v1/products", {
+    currency,
+    q,
+    category,
+    sort,
+    minPrice: unitsToMinor(minPriceUnits),
+    maxPrice: unitsToMinor(maxPriceUnits),
+    page,
+  });
+} catch {
+  hadError = true;
+}
+
+const products = data?.products ?? [];
+const total = data?.total ?? 0;
+const currentPage = data?.page ?? 1;
+const pageSize = data?.pageSize ?? 24;
+
+const heading = q ? `Resultados para: ${q}` : "Productos";
+
+// Params (en unidades) que la paginación debe preservar al cambiar de página.
+const paginationParams = {
+  q,
+  category,
+  sort,
+  minPrice: minPriceUnits,
+  maxPrice: maxPriceUnits,
+};
+---
+
+<Base
+  title={q ? `Buscar: ${q} · Avanzar` : "Productos · Avanzar"}
+  description="Explorá el catálogo de Avanzar con filtros de precio y orden."
+>
+  <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div class="mb-6 flex flex-wrap items-baseline justify-between gap-2">
+      <h1 class="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+        {heading}
+      </h1>
+      {
+        !hadError && total > 0 && (
+          <p class="text-sm text-muted">
+            {total} {total === 1 ? "producto" : "productos"}
+          </p>
+        )
+      }
+    </div>
+
+    <div class="mb-6">
+      <CatalogControls
+        sort={sort}
+        minPrice={minPriceUnits}
+        maxPrice={maxPriceUnits}
+        q={q}
+        category={category}
+        currency={currency}
+      />
+    </div>
+
+    {
+      hadError ? (
+        <div class="rounded-lg border border-line bg-surface p-8 text-center">
+          <p class="text-base font-semibold text-ink">
+            No pudimos cargar los productos
+          </p>
+          <p class="mt-1 text-sm text-muted">
+            Intentá de nuevo en unos instantes.
+          </p>
+        </div>
+      ) : products.length === 0 ? (
+        <div class="rounded-lg border border-line bg-surface p-8 text-center">
+          <p class="text-base font-semibold text-ink">
+            No encontramos productos
+          </p>
+          <p class="mt-1 text-sm text-muted">
+            Probá cambiar los filtros o la búsqueda.
+          </p>
+        </div>
+      ) : (
+        <>
+          <ProductGrid products={products} />
+          <Pagination
+            total={total}
+            page={currentPage}
+            pageSize={pageSize}
+            params={paginationParams}
+          />
+        </>
+      )
+    }
+  </section>
+</Base>

@@ -1,0 +1,139 @@
+---
+import { apiGet } from "../lib/api";
+import { getCurrencyFromCookieHeader } from "../lib/currency";
+import CartButton from "./CartButton.tsx";
+import CurrencySelect from "./CurrencySelect.tsx";
+
+type Category = {
+  id: string;
+  slug: string;
+  name: string;
+  parentId: string | null;
+};
+
+// Nav de categorías raíz (SSR). Si la API falla, degradamos a header sin nav.
+let rootCategories: Category[] = [];
+try {
+  const data = await apiGet<{ categories: Category[] }>("/api/v1/categories");
+  rootCategories = data.categories.filter((c) => c.parentId === null);
+} catch {
+  rootCategories = [];
+}
+
+// Moneda actual desde la cookie (para el valor inicial del selector).
+const currency = getCurrencyFromCookieHeader(
+  Astro.request.headers.get("cookie"),
+);
+---
+
+<header class="sticky top-0 z-50 border-b border-line bg-surface/95 backdrop-blur">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="flex min-h-16 flex-wrap items-center gap-x-4 gap-y-3 py-3">
+      <!-- Wordmark / marca -->
+      <a
+        href="/"
+        class="inline-flex shrink-0 items-center gap-2"
+        aria-label="Avanzar — inicio"
+      >
+        <span
+          class="grid h-9 w-9 place-items-center rounded-lg bg-brand-500 text-white shadow-sm"
+          aria-hidden="true"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            class="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M7 5l7 7-7 7M13 5l4 4-4 4" opacity="0.85"></path>
+          </svg>
+        </span>
+        <span class="text-xl font-extrabold tracking-tight text-ink">
+          Avanzar
+        </span>
+      </a>
+
+      <!-- Buscador (baja a su propia fila en móvil) -->
+      <form
+        action="/productos"
+        method="get"
+        role="search"
+        class="order-last w-full sm:order-none sm:mx-2 sm:w-auto sm:flex-1"
+      >
+        <div class="flex items-center gap-2 rounded-full border border-line bg-paper px-4 py-2 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-200">
+          <svg
+            viewBox="0 0 24 24"
+            class="h-4 w-4 shrink-0 text-muted"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          <input
+            type="search"
+            name="q"
+            placeholder="Buscar productos"
+            aria-label="Buscar productos"
+            class="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+          />
+        </div>
+      </form>
+
+      <!-- Acciones -->
+      <div class="ml-auto flex shrink-0 items-center gap-1 sm:ml-0 sm:gap-2">
+        <CurrencySelect value={currency} client:load />
+
+        <a
+          href="/cuenta"
+          class="hidden items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:bg-brand-50 hover:text-brand-700 sm:inline-flex"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            class="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="8" r="4"></circle>
+            <path d="M4 21a8 8 0 0 1 16 0"></path>
+          </svg>
+          Cuenta
+        </a>
+
+        <CartButton client:load />
+      </div>
+    </div>
+  </div>
+
+  {
+    rootCategories.length > 0 && (
+      <nav aria-label="Categorías" class="border-t border-line bg-surface">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6">
+          <ul class="flex items-center gap-1 overflow-x-auto py-1.5 text-sm">
+            {rootCategories.map((cat) => (
+              <li>
+                <a
+                  href={`/categoria/${cat.slug}`}
+                  class="inline-block whitespace-nowrap rounded-full px-3 py-1.5 font-medium text-ink-soft hover:bg-brand-50 hover:text-brand-700"
+                >
+                  {cat.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </nav>
+    )
+  }
+</header>

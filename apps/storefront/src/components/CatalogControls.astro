@@ -1,0 +1,137 @@
+---
+import type { SupportedCurrency } from "@avanzar/shared";
+
+interface Props {
+  /** Orden activo (uno de los `value` del select). Default: `newest`. */
+  sort?: string;
+  /** Precio mínimo actual, en UNIDADES enteras (ej. "10" = 10 USD). */
+  minPrice?: string;
+  /** Precio máximo actual, en UNIDADES enteras. */
+  maxPrice?: string;
+  /** Búsqueda activa: se preserva como hidden al aplicar filtros. */
+  q?: string;
+  /** Categoría activa: se preserva como hidden al aplicar filtros. */
+  category?: string;
+  /** Moneda activa: solo para rotular los inputs de precio. */
+  currency: SupportedCurrency;
+  /** Base del form/links (permite reusar en /categoria/[slug]). */
+  baseUrl?: string;
+}
+
+const {
+  sort = "newest",
+  minPrice,
+  maxPrice,
+  q,
+  category,
+  currency,
+  baseUrl = "/productos",
+} = Astro.props;
+
+// Los inputs de precio se manejan en UNIDADES enteras (lo natural para el
+// usuario). La PÁGINA (`productos.astro`) los convierte a centavos (×100) antes
+// de llamar al backend, que espera centavos. Al renderizar mostramos las
+// unidades tal como viajan en la URL.
+const sortOptions = [
+  { value: "newest", label: "Más nuevos" },
+  { value: "price_asc", label: "Precio: menor a mayor" },
+  { value: "price_desc", label: "Precio: mayor a menor" },
+  { value: "name", label: "Nombre (A–Z)" },
+];
+
+const hasFilters = Boolean(
+  (sort && sort !== "newest") || minPrice || maxPrice,
+);
+
+// "Limpiar" borra orden y rango de precio, pero preserva el contexto de
+// búsqueda (`q`) y de categoría (`category`), que definen QUÉ se lista.
+const clearParams = new URLSearchParams();
+if (q) clearParams.set("q", q);
+if (category) clearParams.set("category", category);
+const clearHref = clearParams.toString()
+  ? `${baseUrl}?${clearParams.toString()}`
+  : baseUrl;
+---
+
+<form
+  action={baseUrl}
+  method="get"
+  class="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-4"
+  aria-label="Ordenar y filtrar productos"
+>
+  {/* Preservamos el contexto (búsqueda/categoría) al aplicar filtros. */}
+  {q && <input type="hidden" name="q" value={q} />}
+  {category && <input type="hidden" name="category" value={category} />}
+
+  <div class="flex flex-col gap-1">
+    <label for="sort" class="text-xs font-semibold text-ink-soft">
+      Ordenar por
+    </label>
+    <select
+      id="sort"
+      name="sort"
+      class="rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200"
+    >
+      {
+        sortOptions.map((opt) => (
+          <option value={opt.value} selected={opt.value === sort}>
+            {opt.label}
+          </option>
+        ))
+      }
+    </select>
+  </div>
+
+  <div class="flex flex-col gap-1">
+    <label for="minPrice" class="text-xs font-semibold text-ink-soft">
+      Precio mín. ({currency})
+    </label>
+    <input
+      id="minPrice"
+      name="minPrice"
+      type="number"
+      inputmode="numeric"
+      min="0"
+      step="1"
+      value={minPrice}
+      placeholder="0"
+      class="w-24 rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200"
+    />
+  </div>
+
+  <div class="flex flex-col gap-1">
+    <label for="maxPrice" class="text-xs font-semibold text-ink-soft">
+      Precio máx. ({currency})
+    </label>
+    <input
+      id="maxPrice"
+      name="maxPrice"
+      type="number"
+      inputmode="numeric"
+      min="0"
+      step="1"
+      value={maxPrice}
+      placeholder="—"
+      class="w-24 rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200"
+    />
+  </div>
+
+  <div class="flex items-center gap-2">
+    <button
+      type="submit"
+      class="rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-300"
+    >
+      Aplicar
+    </button>
+    {
+      hasFilters && (
+        <a
+          href={clearHref}
+          class="rounded-md px-3 py-2 text-sm font-medium text-ink-soft hover:bg-brand-50 hover:text-brand-700"
+        >
+          Limpiar
+        </a>
+      )
+    }
+  </div>
+</form>

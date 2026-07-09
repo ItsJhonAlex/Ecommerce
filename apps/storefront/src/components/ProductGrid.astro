@@ -1,0 +1,20 @@
+---
+import type { ProductListItem } from "@avanzar/shared";
+import ProductCard from "./ProductCard.astro";
+
+interface Props {
+  products: ProductListItem[];
+}
+
+const { products } = Astro.props;
+---
+
+{
+  products.length > 0 && (
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+      {products.map((product) => (
+        <ProductCard product={product} />
+      ))}
+    </div>
+  )
+}

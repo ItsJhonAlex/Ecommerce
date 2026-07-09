@@ -1,0 +1,98 @@
+---
+interface Props {
+  /** Total de productos que matchean (de la respuesta del backend). */
+  total: number;
+  /** Página actual (1-based). */
+  page: number;
+  /** Tamaño de página (del backend). */
+  pageSize: number;
+  /**
+   * Params actuales de la URL (en unidades, tal como viajan): se preservan en
+   * cada link cambiando solo `page`. Omití `page` acá; lo seteamos nosotros.
+   */
+  params?: Record<string, string | undefined>;
+  /** Base de los links (permite reusar en /categoria/[slug]). */
+  baseUrl?: string;
+}
+
+const { total, page, pageSize, params = {}, baseUrl = "/productos" } =
+  Astro.props;
+
+const totalPages = Math.max(1, Math.ceil(total / pageSize));
+const current = Math.min(Math.max(1, page), totalPages);
+
+/** Arma `baseUrl?<params>&page=N` preservando los demás params. */
+function hrefFor(p: number): string {
+  const usp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "page" || value === undefined || value === "") continue;
+    usp.set(key, value);
+  }
+  usp.set("page", String(p));
+  return `${baseUrl}?${usp.toString()}`;
+}
+
+// Ventana de números alrededor de la página actual (máx. 5).
+const windowSize = 5;
+let start = Math.max(1, current - Math.floor(windowSize / 2));
+let end = Math.min(totalPages, start + windowSize - 1);
+start = Math.max(1, end - windowSize + 1);
+const pageNumbers = Array.from(
+  { length: end - start + 1 },
+  (_, i) => start + i,
+);
+
+const hasPrev = current > 1;
+const hasNext = current < totalPages;
+
+const linkBase =
+  "inline-flex min-w-9 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium";
+const enabled =
+  "border-line bg-surface text-ink-soft hover:bg-brand-50 hover:text-brand-700";
+const disabled =
+  "cursor-default border-line bg-paper text-muted opacity-60";
+---
+
+{
+  totalPages > 1 && (
+    <nav
+      class="mt-8 flex flex-wrap items-center justify-center gap-2"
+      aria-label="Paginación"
+    >
+      {hasPrev ? (
+        <a href={hrefFor(current - 1)} rel="prev" class={`${linkBase} ${enabled}`}>
+          Anterior
+        </a>
+      ) : (
+        <span class={`${linkBase} ${disabled}`} aria-disabled="true">
+          Anterior
+        </span>
+      )}
+
+      {pageNumbers.map((p) =>
+        p === current ? (
+          <span
+            class={`${linkBase} border-brand-500 bg-brand-500 text-white`}
+            aria-current="page"
+          >
+            {p}
+          </span>
+        ) : (
+          <a href={hrefFor(p)} class={`${linkBase} ${enabled}`}>
+            {p}
+          </a>
+        ),
+      )}
+
+      {hasNext ? (
+        <a href={hrefFor(current + 1)} rel="next" class={`${linkBase} ${enabled}`}>
+          Siguiente
+        </a>
+      ) : (
+        <span class={`${linkBase} ${disabled}`} aria-disabled="true">
+          Siguiente
+        </span>
+      )}
+    </nav>
+  )
+}

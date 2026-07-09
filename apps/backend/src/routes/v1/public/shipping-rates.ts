@@ -1,19 +1,38 @@
 import { db } from "@avanzar/db";
 import { shippingRates } from "@avanzar/db/schema";
-import { shippingRateQuerySchema } from "@avanzar/shared";
-import { and, eq } from "drizzle-orm";
+import { shippingRatePublicQuerySchema } from "@avanzar/shared";
+import { and, asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { parseQuery } from "../../../lib/validate";
 
-/** Tarifa de envío para (provincia, moneda). Devuelve 1 match o 404. */
+/**
+ * Tarifas de envío públicas. Con `province` → 1 tarifa (o 404); sin `province`
+ * → lista de todas las activas de la moneda pedida.
+ */
 export const shippingRatesRouter = new Hono();
 
-// GET /api/v1/shipping-rates?province=&currency=
+// GET /api/v1/shipping-rates?currency=USD[&province=Habana]
 shippingRatesRouter.get("/", async (c) => {
-  const parsed = parseQuery(c, shippingRateQuerySchema);
+  const parsed = parseQuery(c, shippingRatePublicQuerySchema);
   if (!parsed.ok) return parsed.response;
   const { province, currency } = parsed.data;
 
+  // Modo lista: solo moneda → todas las activas, ordenadas por provincia.
+  if (province === undefined) {
+    const rates = await db
+      .select()
+      .from(shippingRates)
+      .where(
+        and(
+          eq(shippingRates.currency, currency),
+          eq(shippingRates.active, true),
+        ),
+      )
+      .orderBy(asc(shippingRates.province));
+    return c.json({ shippingRates: rates });
+  }
+
+  // Modo puntual: (provincia, moneda) → una tarifa o 404.
   const [rate] = await db
     .select()
     .from(shippingRates)

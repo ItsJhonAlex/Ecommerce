@@ -1,0 +1,80 @@
+---
+import { apiGet } from "../lib/api";
+
+type PublicSettings = {
+  businessName: string;
+  phone: string | null;
+  address: string | null;
+  email: string | null;
+  receiptNote: string | null;
+};
+
+// Datos del negocio (SSR). Si la API falla, degradamos a "Avanzar" sin contacto.
+let settings: PublicSettings = {
+  businessName: "Avanzar",
+  phone: null,
+  address: null,
+  email: null,
+  receiptNote: null,
+};
+try {
+  const data = await apiGet<{ settings: PublicSettings }>(
+    "/api/v1/store-settings",
+  );
+  settings = data.settings;
+} catch {
+  // sin datos: se mantienen los defaults
+}
+
+const year = new Date().getFullYear();
+const hasContact = Boolean(settings.phone || settings.address || settings.email);
+---
+
+<footer class="mt-16 bg-ink text-paper">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+    <div class="flex flex-col gap-8 sm:flex-row sm:justify-between">
+      <div class="max-w-sm">
+        <span class="text-lg font-extrabold tracking-tight">
+          {settings.businessName}
+        </span>
+        <p class="mt-2 text-sm leading-relaxed text-paper/70">
+          Tu tienda para avanzar. Productos con precios en USD y CUP, a un clic.
+        </p>
+      </div>
+
+      {
+        hasContact && (
+          <div>
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-paper/60">
+              Contacto
+            </h2>
+            <ul class="mt-3 space-y-2 text-sm text-paper/80">
+              {settings.phone && (
+                <li>
+                  <a href={`tel:${settings.phone}`} class="hover:text-brand-300">
+                    {settings.phone}
+                  </a>
+                </li>
+              )}
+              {settings.email && (
+                <li>
+                  <a
+                    href={`mailto:${settings.email}`}
+                    class="hover:text-brand-300"
+                  >
+                    {settings.email}
+                  </a>
+                </li>
+              )}
+              {settings.address && <li>{settings.address}</li>}
+            </ul>
+          </div>
+        )
+      }
+    </div>
+
+    <div class="mt-10 border-t border-paper/15 pt-6 text-xs text-paper/60">
+      © {year} {settings.businessName}. Todos los derechos reservados.
+    </div>
+  </div>
+</footer>

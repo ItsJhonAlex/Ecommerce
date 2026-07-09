@@ -1,0 +1,165 @@
+---
+import Base from "../../layouts/Base.astro";
+import CatalogControls from "../../components/CatalogControls.astro";
+import ProductGrid from "../../components/ProductGrid.astro";
+import Pagination from "../../components/Pagination.astro";
+import { apiGet, type ProductListResponse } from "../../lib/api";
+import { getCurrencyFromCookieHeader } from "../../lib/currency";
+import { emptyToUndef, unitsToMinor } from "../../lib/catalog";
+
+// La categoría viene FIJA por la ruta; no se lee de la query.
+const { slug } = Astro.params;
+
+// --- Lectura de la query (todo opcional) ------------------------------------
+const sp = Astro.url.searchParams;
+
+const sort = emptyToUndef(sp.get("sort"));
+const page = emptyToUndef(sp.get("page"));
+// minPrice/maxPrice viajan en la URL en UNIDADES enteras; los guardamos tal
+// cual para re-emitirlos en los inputs y en los links de paginación.
+const minPriceUnits = emptyToUndef(sp.get("minPrice"));
+const maxPriceUnits = emptyToUndef(sp.get("maxPrice"));
+
+const currency = getCurrencyFromCookieHeader(
+  Astro.request.headers.get("cookie"),
+);
+
+// --- Resolución de la categoría (nombre + existencia) -----------------------
+// Buscamos la categoría por slug en la lista plana pública. Si el fetch falla
+// lo tratamos como error suave (no como 404): la categoría podría existir.
+type CategoryItem = { name: string; slug: string; parentId: string | null };
+let category: CategoryItem | undefined;
+let categoriesError = false;
+try {
+  const { categories } = await apiGet<{ categories: CategoryItem[] }>(
+    "/api/v1/categories",
+  );
+  category = categories.find((cat) => cat.slug === slug);
+} catch {
+  categoriesError = true;
+}
+
+// Categoría inexistente (y el listado sí cargó) → 404.
+const notFound = !categoriesError && !category;
+if (notFound) {
+  Astro.response.status = 404;
+}
+
+const categoryName = category?.name ?? slug;
+
+// --- Fetch al catálogo (solo si la categoría existe) ------------------------
+let data: ProductListResponse | null = null;
+let hadError = categoriesError;
+if (!notFound && !categoriesError) {
+  try {
+    data = await apiGet<ProductListResponse>("/api/v1/products", {
+      currency,
+      category: slug,
+      sort,
+      minPrice: unitsToMinor(minPriceUnits),
+      maxPrice: unitsToMinor(maxPriceUnits),
+      page,
+    });
+  } catch {
+    hadError = true;
+  }
+}
+
+const products = data?.products ?? [];
+const total = data?.total ?? 0;
+const currentPage = data?.page ?? 1;
+const pageSize = data?.pageSize ?? 24;
+
+const baseUrl = `/categoria/${slug}`;
+
+// Params (en unidades) que la paginación debe preservar al cambiar de página.
+const paginationParams = {
+  sort,
+  minPrice: minPriceUnits,
+  maxPrice: maxPriceUnits,
+};
+---
+
+<Base
+  title={notFound
+    ? "Categoría no encontrada · Avanzar"
+    : `${categoryName} · Avanzar`}
+  description={notFound
+    ? "La categoría que buscás no existe."
+    : `Explorá los productos de ${categoryName} en Avanzar.`}
+>
+  <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    {
+      notFound ? (
+        <div class="rounded-lg border border-line bg-surface p-8 text-center">
+          <p class="text-base font-semibold text-ink">
+            Categoría no encontrada
+          </p>
+          <p class="mt-1 text-sm text-muted">
+            La categoría que buscás no existe o fue movida.
+          </p>
+          <a
+            href="/productos"
+            class="mt-4 inline-flex rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-300"
+          >
+            Ver todos los productos
+          </a>
+        </div>
+      ) : (
+        <>
+          <div class="mb-6 flex flex-wrap items-baseline justify-between gap-2">
+            <h1 class="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+              {categoryName}
+            </h1>
+            {!hadError && total > 0 && (
+              <p class="text-sm text-muted">
+                {total} {total === 1 ? "producto" : "productos"}
+              </p>
+            )}
+          </div>
+
+          <div class="mb-6">
+            <CatalogControls
+              sort={sort}
+              minPrice={minPriceUnits}
+              maxPrice={maxPriceUnits}
+              currency={currency}
+              baseUrl={baseUrl}
+            />
+          </div>
+
+          {hadError ? (
+            <div class="rounded-lg border border-line bg-surface p-8 text-center">
+              <p class="text-base font-semibold text-ink">
+                No pudimos cargar los productos
+              </p>
+              <p class="mt-1 text-sm text-muted">
+                Intentá de nuevo en unos instantes.
+              </p>
+            </div>
+          ) : products.length === 0 ? (
+            <div class="rounded-lg border border-line bg-surface p-8 text-center">
+              <p class="text-base font-semibold text-ink">
+                No hay productos en esta categoría
+              </p>
+              <p class="mt-1 text-sm text-muted">
+                Probá cambiar los filtros o volvé más tarde.
+              </p>
+            </div>
+          ) : (
+            <>
+              <ProductGrid products={products} />
+              <Pagination
+                total={total}
+                page={currentPage}
+                pageSize={pageSize}
+                params={paginationParams}
+                baseUrl={baseUrl}
+              />
+            </>
+          )}
+        </>
+      )
+    }
+  </section>
+</Base>

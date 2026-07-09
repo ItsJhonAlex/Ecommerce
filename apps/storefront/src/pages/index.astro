@@ -1,13 +1,159 @@
 ---
+import Base from "../layouts/Base.astro";
+import ProductGrid from "../components/ProductGrid.astro";
+import { apiGet, type ProductListResponse } from "../lib/api";
+import { getCurrencyFromCookieHeader } from "../lib/currency";
+
+type Category = {
+  id: string;
+  slug: string;
+  name: string;
+  parentId: string | null;
+};
+
+// Moneda activa desde la cookie (SSR).
+const currency = getCurrencyFromCookieHeader(
+  Astro.request.headers.get("cookie"),
+);
+
+// --- Nombre del negocio para el hero (degradación → "Avanzar") --------------
+let businessName = "Avanzar";
+try {
+  const data = await apiGet<{ settings: { businessName: string } }>(
+    "/api/v1/store-settings",
+  );
+  if (data.settings.businessName) businessName = data.settings.businessName;
+} catch {
+  // sin datos: se mantiene el fallback "Avanzar"
+}
+
+// --- Novedades (degradación suave: sección oculta ante error/vacío) ----------
+let novedades: ProductListResponse["products"] = [];
+try {
+  const data = await apiGet<ProductListResponse>("/api/v1/products", {
+    sort: "newest",
+    pageSize: 8,
+    currency,
+  });
+  novedades = data.products;
+} catch {
+  novedades = [];
+}
+
+// --- Categorías raíz (degradación suave: sección oculta ante error) ----------
+let rootCategories: Category[] = [];
+try {
+  const data = await apiGet<{ categories: Category[] }>("/api/v1/categories");
+  rootCategories = data.categories.filter((c) => c.parentId === null);
+} catch {
+  rootCategories = [];
+}
 ---
 
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Avanzar</title>
-  </head>
-  <body>
-    <h1>Avanzar · Storefront</h1>
-  </body>
-</html>
+<Base
+  title="Avanzar · Tienda"
+  description="Tu tienda para avanzar. Productos con precios en USD y CUP."
+>
+  <!-- Hero de marca ------------------------------------------------------- -->
+  <section class="relative overflow-hidden bg-brand-50">
+    <div
+      class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand-200/50 blur-3xl"
+      aria-hidden="true"
+    >
+    </div>
+    <div
+      class="pointer-events-none absolute -bottom-32 -left-24 h-72 w-72 rounded-full bg-jade-100/70 blur-3xl"
+      aria-hidden="true"
+    >
+    </div>
+
+    <div
+      class="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:py-28"
+    >
+      <div class="max-w-2xl">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-wider text-brand-700 shadow-sm"
+        >
+          <span
+            class="h-1.5 w-1.5 rounded-full bg-jade-500"
+            aria-hidden="true"></span>
+          Precios en USD y CUP
+        </span>
+
+        <h1
+          class="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight text-ink sm:text-5xl lg:text-6xl"
+        >
+          {businessName}
+        </h1>
+        <p class="mt-4 max-w-xl text-lg leading-relaxed text-ink-soft sm:text-xl">
+          Tu tienda para avanzar. Encontrá lo que buscás y pagá en la moneda que
+          te quede cómoda, con envío a tu provincia.
+        </p>
+
+        <div class="mt-8 flex flex-wrap items-center gap-3">
+          <a
+            href="/productos"
+            class="inline-flex items-center gap-2 rounded-full bg-brand-500 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 focus-visible:outline-none"
+          >
+            Ver productos
+            <svg
+              viewBox="0 0 24 24"
+              class="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14M13 6l6 6-6 6"></path>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categorías: accesos rápidos ----------------------------------------- -->
+  {
+    rootCategories.length > 0 && (
+      <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <h2 class="text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
+          Categorías
+        </h2>
+        <ul class="mt-5 flex flex-wrap gap-2.5">
+          {rootCategories.map((cat) => (
+            <li>
+              <a
+                href={`/categoria/${cat.slug}`}
+                class="inline-flex items-center rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+              >
+                {cat.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  <!-- Novedades ------------------------------------------------------------ -->
+  {
+    novedades.length > 0 && (
+      <section class="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
+        <div class="mb-6 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
+            Novedades
+          </h2>
+          <a
+            href="/productos?sort=newest"
+            class="text-sm font-semibold text-brand-700 hover:text-brand-600"
+          >
+            Ver todo →
+          </a>
+        </div>
+        <ProductGrid products={novedades} />
+      </section>
+    )
+  }
+</Base>

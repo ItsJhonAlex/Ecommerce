@@ -6,6 +6,7 @@ import { ordersRouter } from "./orders";
 import { productsRouter } from "./products";
 import { receiptRouter } from "./receipt";
 import { shippingRatesRouter } from "./shipping-rates";
+import { storeSettingsRouter } from "./store-settings";
 import { trackRouter } from "./track";
 
 /** Rutas públicas / del cliente. Las que requieren sesión la exigen internamente. */
@@ -19,3 +20,4 @@ publicRoutes.route("/orders", ordersRouter);
 publicRoutes.route("/checkout", checkoutRouter);
 publicRoutes.route("/receipt", receiptRouter);
 publicRoutes.route("/track", trackRouter);
+publicRoutes.route("/store-settings", storeSettingsRouter);

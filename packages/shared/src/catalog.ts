@@ -59,6 +59,48 @@ export const productAdminQuerySchema = z.object({
 
 export type ProductAdminQuery = z.infer<typeof productAdminQuerySchema>;
 
+/** Monedas soportadas por el storefront. */
+export const SUPPORTED_CURRENCIES = ["USD", "CUP"] as const;
+export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
+
+const emptyToUndef = (v: unknown) => (v === "" ? undefined : v);
+
+/**
+ * Query de GET /products (catálogo público). Currency-aware: filtra por moneda,
+ * categoría, texto y rango de precio; ordena y pagina.
+ */
+export const productPublicQuerySchema = z.object({
+  currency: z.enum(SUPPORTED_CURRENCIES).default("USD"),
+  category: z.preprocess(emptyToUndef, z.string().min(1).optional()),
+  q: z.preprocess(emptyToUndef, z.string().min(1).optional()),
+  sort: z.enum(["price_asc", "price_desc", "name", "newest"]).default("newest"),
+  minPrice: z.coerce.number().int().nonnegative().optional(),
+  maxPrice: z.coerce.number().int().nonnegative().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(48).default(24),
+});
+
+export type ProductPublicQuery = z.infer<typeof productPublicQuerySchema>;
+
+/** Item de la grilla del catálogo público (forma expuesta al front). */
+export type ProductListItem = {
+  id: string;
+  slug: string;
+  name: string;
+  priceMinor: number;
+  currency: string;
+  image: { url: string; alt: string | null } | null;
+  stockQuantity: number;
+};
+
+/** Respuesta de GET /products (lista paginada). */
+export type ProductListResponse = {
+  products: ProductListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 /** Array de estados de producto (para selects del front sin tocar @avanzar/db). */
 export const PRODUCT_STATUSES: readonly (typeof productStatus.enumValues)[number][] =
   productStatus.enumValues;

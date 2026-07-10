@@ -1,29 +1,38 @@
 import { useState } from "react";
+import type { SupportedCurrency } from "@avanzar/shared";
+import { $cartOpen, addItem } from "../stores/cart";
 
 interface Props {
-  /** Slug del producto (lo usará la lógica real de carrito en S2). */
+  productId: string;
   slug: string;
-  /** Deshabilita la acción (p. ej. producto agotado). */
-  disabled?: boolean;
+  name: string;
+  image: { url: string; alt: string | null } | null;
+  priceByCurrency: Partial<Record<SupportedCurrency, number>>;
+  stockQuantity: number;
 }
 
 /**
- * Isla UI: selector de cantidad + botón "Agregar al carrito".
+ * Isla: selector de cantidad + botón "Agregar al carrito".
  *
- * En S1 la acción está DESHABILITADA a propósito: el carrito real (nanostores +
- * persistencia) llega en S2. El marcado ya queda listo para conectarse: el
- * `handleAdd` de abajo es un no-op documentado que S2 reemplazará por el
- * `addToCart(slug, quantity)` real. El botón se muestra deshabilitado y, si no
- * es por agotado, con la nota "Carrito próximamente".
+ * Al click: agrega la línea al store (`addItem`) y abre el drawer
+ * (`$cartOpen.set(true)`) como feedback. Si `stockQuantity === 0`, la
+ * acción se muestra deshabilitada con la nota "Producto agotado".
  */
-export default function AddToCart({ slug, disabled = false }: Props) {
+export default function AddToCart({
+  productId,
+  slug,
+  name,
+  image,
+  priceByCurrency,
+  stockQuantity,
+}: Props) {
   const [quantity, setQuantity] = useState(1);
+  const soldOut = stockQuantity === 0;
 
-  // S2: reemplazar por la mutación real del store de carrito (addToCart(slug, quantity)).
-  // En S1 el botón está deshabilitado, así que esto no llega a ejecutarse.
   function handleAdd() {
-    void slug;
-    void quantity;
+    if (soldOut) return;
+    addItem({ productId, slug, name, image, priceByCurrency, quantity });
+    $cartOpen.set(true);
   }
 
   return (
@@ -40,7 +49,7 @@ export default function AddToCart({ slug, disabled = false }: Props) {
           type="number"
           min={1}
           value={quantity}
-          disabled={disabled}
+          disabled={soldOut}
           onChange={(event) => {
             const next = Number.parseInt(event.target.value, 10);
             setQuantity(Number.isNaN(next) || next < 1 ? 1 : next);
@@ -52,16 +61,14 @@ export default function AddToCart({ slug, disabled = false }: Props) {
       <button
         type="button"
         onClick={handleAdd}
-        disabled
-        aria-disabled="true"
-        className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70"
+        disabled={soldOut}
+        aria-disabled={soldOut}
+        className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 font-semibold text-white shadow-sm hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70"
       >
         Agregar al carrito
       </button>
 
-      <p className="text-xs text-muted">
-        {disabled ? "Producto agotado" : "Carrito próximamente"}
-      </p>
+      {soldOut && <p className="text-xs text-muted">Producto agotado</p>}
     </div>
   );
 }

@@ -43,3 +43,14 @@ export function setCurrencyCookie(currency: SupportedCurrency): void {
   const maxAge = 60 * 60 * 24 * 365; // 1 año en segundos
   document.cookie = `${CURRENCY_COOKIE}=${currency}; path=/; max-age=${maxAge}; SameSite=Lax`;
 }
+
+/**
+ * Lee la moneda desde `document.cookie` en el cliente. SSR-safe: si no hay
+ * `document` (renderizado en el server), devuelve USD. Usado por islas React
+ * que deciden en qué moneda renderizar precios sin recibir la moneda por prop.
+ */
+export function getCurrencyClient(): SupportedCurrency {
+  return getCurrencyFromCookieHeader(
+    typeof document === "undefined" ? null : document.cookie,
+  );
+}

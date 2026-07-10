@@ -5,6 +5,7 @@ import AddToCart from "../../components/AddToCart.tsx";
 import { ApiError, apiGet } from "../../lib/api";
 import { getCurrencyFromCookieHeader } from "../../lib/currency";
 import { money } from "../../lib/money";
+import { SUPPORTED_CURRENCIES, type SupportedCurrency } from "@avanzar/shared";
 
 /**
  * Forma del detalle público (`GET /api/v1/products/:slug` → `{ product }`).
@@ -59,6 +60,24 @@ const price = product?.prices.find((p) => p.currency === currency);
 const soldOut = product ? product.stockQuantity === 0 : false;
 const images = product?.images.map((img) => ({ url: img.url, alt: img.alt })) ?? [];
 const title = product ? `${product.name} · Avanzar` : "Producto · Avanzar";
+
+// Mapeo de precios para el store del carrito: filtramos por monedas soportadas
+// (los precios del backend traen `currency: string`; el store espera
+// `Partial<Record<SupportedCurrency, number>>`).
+const priceByCurrency: Partial<Record<SupportedCurrency, number>> = product
+  ? product.prices.reduce<Partial<Record<SupportedCurrency, number>>>(
+      (acc, p) => {
+        if ((SUPPORTED_CURRENCIES as readonly string[]).includes(p.currency)) {
+          acc[p.currency as SupportedCurrency] = p.amountMinor;
+        }
+        return acc;
+      },
+      {},
+    )
+  : {};
+const firstImage = product && product.images.length > 0
+  ? { url: product.images[0]!.url, alt: product.images[0]!.alt }
+  : null;
 ---
 
 <Base title={title} description={product?.description ?? undefined}>
@@ -128,7 +147,15 @@ const title = product ? `${product.name} · Avanzar` : "Producto · Avanzar";
             }
 
             <div class="border-t border-line pt-6">
-              <AddToCart slug={product.slug} disabled={soldOut} client:load />
+              <AddToCart
+                client:load
+                productId={product.id}
+                slug={product.slug}
+                name={product.name}
+                image={firstImage}
+                priceByCurrency={priceByCurrency}
+                stockQuantity={product.stockQuantity}
+              />
             </div>
           </div>
         </div>

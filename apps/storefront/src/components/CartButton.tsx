@@ -1,13 +1,17 @@
+import { useStore } from "@nanostores/react";
+import { $cartOpen, $count } from "../stores/cart";
+
 /**
- * Isla: botón de carrito. En S1 muestra 0; en S2 se conecta a nanostores.
- * Enlaza a /carrito (placeholder de S2).
+ * Isla: botón del carrito. Muestra el badge con el count vivo del store y
+ * al click abre el drawer del carrito.
  */
 export default function CartButton() {
-  const count = 0;
+  const count = useStore($count);
 
   return (
-    <a
-      href="/carrito"
+    <button
+      type="button"
+      onClick={() => $cartOpen.set(true)}
       aria-label={`Carrito (${count})`}
       className="relative inline-flex items-center justify-center rounded-full p-2 text-ink-soft hover:bg-brand-50 hover:text-brand-700"
     >
@@ -31,6 +35,6 @@ export default function CartButton() {
       >
         {count}
       </span>
-    </a>
+    </button>
   );
 }

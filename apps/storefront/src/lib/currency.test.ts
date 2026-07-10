@@ -1,6 +1,7 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   CURRENCY_COOKIE,
+  getCurrencyClient,
   getCurrencyFromCookieHeader,
   parseCurrency,
 } from "./currency";
@@ -40,5 +41,29 @@ describe("getCurrencyFromCookieHeader", () => {
 describe("CURRENCY_COOKIE", () => {
   test("es 'currency'", () => {
     expect(CURRENCY_COOKIE).toBe("currency");
+  });
+});
+
+describe("getCurrencyClient", () => {
+  afterEach(() => {
+    // Restaurar globals stub-eados primero (algunos tests undefine `document`),
+    // y recién ahí limpiar la cookie.
+    vi.unstubAllGlobals();
+    document.cookie = `${CURRENCY_COOKIE}=; path=/; max-age=0`;
+  });
+
+  test("con cookie currency=CUP → CUP", () => {
+    document.cookie = `${CURRENCY_COOKIE}=CUP; path=/`;
+    expect(getCurrencyClient()).toBe("CUP");
+  });
+
+  test("sin cookie → USD", () => {
+    // jsdom empieza con document.cookie vacío; el afterEach anterior limpia.
+    expect(getCurrencyClient()).toBe("USD");
+  });
+
+  test("SSR-safe: sin `document` → USD", () => {
+    vi.stubGlobal("document", undefined);
+    expect(getCurrencyClient()).toBe("USD");
   });
 });

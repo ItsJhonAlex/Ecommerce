@@ -1,0 +1,61 @@
+---
+import Base from "../layouts/Base.astro";
+import CheckoutWizard from "../components/CheckoutWizard.tsx";
+import { apiGet } from "../lib/api";
+import { getCurrencyFromCookieHeader } from "../lib/currency";
+
+// Moneda activa desde la cookie (para que las tarifas coincidan con la
+// moneda con la que se armaron los precios del carrito).
+const currency = getCurrencyFromCookieHeader(
+  Astro.request.headers.get("cookie"),
+);
+
+// Tipos locales del subset relevante — el storefront no importa @avanzar/db,
+// así que definimos aquí exactamente los campos que consumimos.
+type ShippingRate = {
+  province: string;
+  amountMinor: number;
+  currency: string;
+};
+type PublicSettings = {
+  businessName: string;
+  phone: string | null;
+  address: string | null;
+  email: string | null;
+  receiptNote: string | null;
+};
+
+let shippingRates: ShippingRate[] = [];
+let storeName = "Avanzar";
+let storeAddress: string | null = null;
+
+try {
+  const data = await apiGet<{ shippingRates: ShippingRate[] }>(
+    "/api/v1/shipping-rates",
+    { currency },
+  );
+  shippingRates = data.shippingRates;
+} catch {
+  // Degradación: si falla, el wizard mostrará el aviso "no hay envíos
+  // configurados para {currency}" en el paso de entrega si elegís delivery.
+}
+
+try {
+  const data = await apiGet<{ settings: PublicSettings }>(
+    "/api/v1/store-settings",
+  );
+  storeName = data.settings.businessName ?? "Avanzar";
+  storeAddress = data.settings.address;
+} catch {
+  // Degradación: caemos al default ("Avanzar", sin dirección).
+}
+---
+
+<Base title="Checkout · Avanzar" description="Finalizá tu pedido en Avanzar.">
+  <CheckoutWizard
+    client:load
+    shippingRates={shippingRates}
+    storeName={storeName}
+    storeAddress={storeAddress}
+  />
+</Base>

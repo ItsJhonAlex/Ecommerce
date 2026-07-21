@@ -9,6 +9,8 @@ import {
 } from "../stores/cart";
 import type { SupportedCurrency } from "@avanzar/shared";
 import { apiUrl } from "../lib/api";
+import { authClient } from "../lib/auth";
+import { setPendingClaimToken } from "../lib/claim";
 import { getCurrencyClient } from "../lib/currency";
 import { money } from "../lib/money";
 
@@ -110,6 +112,7 @@ export default function CheckoutWizard({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successOrder, setSuccessOrder] = useState<SuccessOrder | null>(null);
+  const [isGuestOrder, setIsGuestOrder] = useState(false);
 
   // Si la moneda cambia entre steps (edge case) y el método actual no aplica,
   // lo forzamos al default de la moneda para no mandar payload inválido.
@@ -136,7 +139,7 @@ export default function CheckoutWizard({
 
   // ----- Éxito inline -------------------------------------------------------
   if (successOrder) {
-    return <SuccessPanel order={successOrder} />;
+    return <SuccessPanel order={successOrder} isGuest={isGuestOrder} />;
   }
 
   // ----- Carrito vacío ------------------------------------------------------
@@ -207,7 +210,10 @@ export default function CheckoutWizard({
   }
 
   async function handleSubmit() {
-    if (hasUnavailable) return;
+    // Guard de doble-submit: el botón se deshabilita con `submitting`, pero React
+    // no re-renderiza sincrónicamente → un double-tap podría disparar dos POST y
+    // duplicar la orden (descontando stock dos veces). Corte en la fuente.
+    if (submitting || hasUnavailable) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -260,6 +266,26 @@ export default function CheckoutWizard({
             currency: string;
           };
         };
+        // Detectar sesión ANTES de renderizar el panel de éxito: si no hay
+        // usuario logueado, guardamos el token pendiente para reclamar la orden
+        // tras login/registro y marcamos el pedido como de invitado (banner).
+        //
+        // CRÍTICO: la orden YA está confirmada (201) en el server. Un fallo de
+        // `getSession()` NO debe caer al `catch` externo (que renderiza error y
+        // re-habilita "Confirmar pedido" → doble orden). Por eso lo envolvemos en
+        // su propio try/catch y, ante cualquier error, tratamos el pedido como de
+        // invitado (best-effort): el cliente igual puede reclamarlo luego.
+        let hasUser = false;
+        try {
+          const { data: session } = await authClient.getSession();
+          hasUser = Boolean(session?.user);
+        } catch {
+          hasUser = false;
+        }
+        if (!hasUser) {
+          setPendingClaimToken(body.order.receiptToken);
+          setIsGuestOrder(true);
+        }
         clearCart();
         setSuccessOrder({
           orderNumber: body.order.orderNumber,
@@ -899,7 +925,13 @@ function Field({
   );
 }
 
-function SuccessPanel({ order }: { order: SuccessOrder }) {
+function SuccessPanel({
+  order,
+  isGuest,
+}: {
+  order: SuccessOrder;
+  isGuest: boolean;
+}) {
   return (
     <section className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
       <div className="flex flex-col items-center gap-6 rounded-2xl border border-jade-100 bg-surface px-6 py-12 text-center shadow-sm">
@@ -945,6 +977,31 @@ function SuccessPanel({ order }: { order: SuccessOrder }) {
           Total: {money(order.totalMinor, order.currency)}
         </p>
 
+        {isGuest && (
+          <div className="mt-2 w-full rounded-xl border border-brand-100 bg-brand-50 px-5 py-4 text-sm text-ink-soft">
+            <p className="font-semibold text-ink">
+              ¿Querés seguir este pedido desde tu cuenta?
+            </p>
+            <p className="mt-1">
+              Creá una cuenta o ingresá y lo vinculamos automáticamente.
+            </p>
+            <div className="mt-3 flex justify-center gap-3">
+              <a
+                href="/registro"
+                className="inline-flex items-center justify-center rounded-full bg-brand-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-600"
+              >
+                Crear cuenta
+              </a>
+              <a
+                href="/login"
+                className="inline-flex items-center justify-center rounded-full border border-line bg-surface px-5 py-2 text-sm font-semibold text-ink hover:border-brand-300"
+              >
+                Ingresar
+              </a>
+            </div>
+          </div>
+        )}
+
         <div className="mt-2 flex flex-wrap justify-center gap-3">
           <a
             href={`/api/v1/receipt/${order.receiptToken}`}
@@ -953,6 +1010,12 @@ function SuccessPanel({ order }: { order: SuccessOrder }) {
             className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-600"
           >
             Ver recibo
+          </a>
+          <a
+            href={`/seguimiento/${order.receiptToken}`}
+            className="inline-flex items-center justify-center rounded-full border border-line bg-surface px-6 py-2.5 text-sm font-semibold text-ink hover:border-brand-300 hover:text-brand-700"
+          >
+            Seguir mi pedido
           </a>
           <a
             href="/"

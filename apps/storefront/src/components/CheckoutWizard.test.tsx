@@ -2,6 +2,15 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import CheckoutWizard from "./CheckoutWizard.tsx";
 import { $cart, $cartOpen, type CartLine } from "../stores/cart";
+import { authClient } from "../lib/auth";
+import {
+  clearPendingClaimToken,
+  getPendingClaimToken,
+} from "../lib/claim";
+
+vi.mock("../lib/auth", () => ({
+  authClient: { getSession: vi.fn() },
+}));
 
 /**
  * Suite del wizard de checkout. Los tests siembran el store con al menos una
@@ -84,6 +93,12 @@ describe("CheckoutWizard", () => {
     $cartOpen.set(false);
     document.cookie = "currency=USD; path=/";
     vi.unstubAllGlobals();
+    clearPendingClaimToken();
+    // Default seguro: todos los tests que llegan al 201 ejecutan getSession().
+    // Sin sesión por defecto → los tests previos no rompen al destructurar `data`.
+    (authClient.getSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: null,
+    });
   });
 
   test("Contacto: email inválido bloquea el Siguiente y muestra el error", () => {
@@ -241,6 +256,32 @@ describe("CheckoutWizard", () => {
     expect(body.items).toEqual([{ productId: "p1", quantity: 1 }]);
   });
 
+  test("la confirmación incluye un link 'Seguir mi pedido' hacia /seguimiento/:token", async () => {
+    seedCart();
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        order: {
+          orderNumber: "A-1",
+          receiptToken: "tok-abc",
+          totalMinor: 5000,
+          currency: "USD",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAndAdvanceToReview();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar pedido" }));
+
+    const link = await screen.findByRole("link", {
+      name: /seguir mi pedido/i,
+    });
+    expect(link).toHaveAttribute("href", "/seguimiento/tok-abc");
+  });
+
   test("Submit 422 INSUFFICIENT_STOCK: mensaje de stock y carrito intacto", async () => {
     seedCart();
 
@@ -261,5 +302,101 @@ describe("CheckoutWizard", () => {
     // Seguimos en la vista de Revisión y el carrito no se vació.
     expect(screen.getByText("Revisá tu pedido")).toBeInTheDocument();
     expect($cart.get()).toHaveLength(1);
+  });
+
+  test("checkout sin sesión guarda el token pendiente y muestra el banner de cuenta", async () => {
+    (authClient.getSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: null,
+    });
+    seedCart();
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        order: {
+          orderNumber: "A-3",
+          receiptToken: "tok-guest",
+          totalMinor: 5000,
+          currency: "USD",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAndAdvanceToReview();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar pedido" }));
+
+    expect(
+      await screen.findByText(/querés seguir este pedido desde tu cuenta/i),
+    ).toBeInTheDocument();
+    expect(getPendingClaimToken()).toBe("tok-guest");
+  });
+
+  test("checkout CON sesión no guarda token pendiente ni muestra el banner", async () => {
+    (authClient.getSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { user: { id: "u1" } },
+    });
+    seedCart();
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        order: {
+          orderNumber: "A-4",
+          receiptToken: "tok-user",
+          totalMinor: 5000,
+          currency: "USD",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAndAdvanceToReview();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar pedido" }));
+
+    await screen.findByText("A-4");
+    expect(
+      screen.queryByText(/querés seguir este pedido desde tu cuenta/i),
+    ).toBeNull();
+    expect(getPendingClaimToken()).toBeNull();
+  });
+
+  test("si getSession() falla tras el 201, igual muestra el éxito (no error) y trata el pedido como invitado", async () => {
+    // FIX 2 (S3): la orden ya está confirmada (201). Un fallo de getSession()
+    // NO debe renderizar el panel de error ni re-habilitar "Confirmar pedido"
+    // (evita el path de doble orden). Debe degradar a invitado (best-effort).
+    (authClient.getSession as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("network"),
+    );
+    seedCart();
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        order: {
+          orderNumber: "A-5",
+          receiptToken: "tok-fallback",
+          totalMinor: 5000,
+          currency: "USD",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAndAdvanceToReview();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar pedido" }));
+
+    // El panel de éxito se renderiza (orderNumber visible), NO el de error.
+    expect(await screen.findByText("A-5")).toBeInTheDocument();
+    // Degradó a invitado: guardó el token pendiente + muestra el banner.
+    expect(getPendingClaimToken()).toBe("tok-fallback");
+    expect(
+      screen.getByText(/querés seguir este pedido desde tu cuenta/i),
+    ).toBeInTheDocument();
+    // El fetch de checkout se llamó UNA sola vez (no hubo re-submit).
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,6 +1,7 @@
 ---
 import { apiGet } from "../lib/api";
 import { getCurrencyFromCookieHeader } from "../lib/currency";
+import AccountLink from "./AccountLink.tsx";
 import CartButton from "./CartButton.tsx";
 import CurrencySelect from "./CurrencySelect.tsx";
 
@@ -91,25 +92,7 @@ const currency = getCurrencyFromCookieHeader(
       <div class="ml-auto flex shrink-0 items-center gap-1 sm:ml-0 sm:gap-2">
         <CurrencySelect value={currency} client:load />
 
-        <a
-          href="/cuenta"
-          class="hidden items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:bg-brand-50 hover:text-brand-700 sm:inline-flex"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            class="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="8" r="4"></circle>
-            <path d="M4 21a8 8 0 0 1 16 0"></path>
-          </svg>
-          Cuenta
-        </a>
+        <AccountLink client:load />
 
         <CartButton client:load />
       </div>
